@@ -1,0 +1,42 @@
+import { roundInputSchema, personaSchema } from '../config/schema.js';
+import type { UsabilityReport } from './types.js';
+import { EvidenceRecorder } from '../evidence/recorder.js';
+import type { ReasoningProvider } from '../reasoning/provider.js';
+import { SessionOrchestrator } from './session-orchestrator.js';
+import { synthesizeReports } from './synthesis.js';
+
+export class RoundOrchestrator {
+  constructor(private readonly recorder: EvidenceRecorder, private readonly sessions: SessionOrchestrator) {}
+  async run(rawInput: unknown, providerFactory: () => ReasoningProvider, signal?: AbortSignal, onCreated?: (id: string) => void) {
+    const input = roundInputSchema.parse(rawInput);
+    const { id, paths } = await this.recorder.create('round');
+    onCreated?.(id);
+    const { personas: supplied, participantCount, personaContext, ...shared } = input;
+    const variations = [
+      { technicalConfidence: 'average', constraints: ['using the product for the first time', 'limited time to scan the interface'] },
+      { technicalConfidence: 'low', constraints: ['using the product for the first time', 'unfamiliar with this product category'] },
+      { technicalConfidence: 'high', constraints: ['using the product for the first time', 'wants to compare available choices'] },
+      { technicalConfidence: 'average', constraints: ['using the product for the first time', 'needs to understand terms before committing'] },
+      { technicalConfidence: 'low', constraints: ['using the product for the first time', 'prefers concise plain-language instructions'] },
+    ];
+    const personas = supplied ?? Array.from({ length: participantCount }, (_, i) => personaSchema.parse({
+      name: `Participant ${i + 1}`, context: personaContext, productKnowledge: 'none', ...variations[i],
+    }));
+    const reports: UsabilityReport[] = [];
+    await this.recorder.json(paths.journey, { id, kind: 'round', input, sessionIds: [], status: 'running' });
+    for (const persona of personas) {
+      if (signal?.aborted && reports.length) break;
+      // Browser/provider objects are fresh. A host chat must manage its own model-context isolation.
+      const run = await this.sessions.run({ ...shared, persona }, providerFactory(), signal);
+      reports.push(run.report);
+      await this.recorder.json(paths.journey, { id, kind: 'round', input,
+        sessionIds: reports.flatMap(r => r.sessions.map(s => s.id)), status: 'running' });
+    }
+    const report = synthesizeReports(reports, id);
+    if (reports.length !== participantCount) report.limitations.push(`Round stopped after ${reports.length} of ${participantCount} planned participants.`);
+    await this.recorder.finish(report);
+    const status = signal?.aborted ? 'cancelled' : reports.some(r => r.sessions.some(s => s.status === 'error')) ? 'partial' : 'finished';
+    await this.recorder.json(paths.journey, { id, kind: 'round', input, sessionIds: report.sessions.map(s => s.id), status });
+    return { id, status, report, paths };
+  }
+}

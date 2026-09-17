@@ -1,0 +1,43 @@
+{
+  "name": "usability-mcp",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Local-first synthetic usability testing over MCP",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node scripts/clean.mjs && tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/src/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "tsx --test tests/unit/*.test.ts tests/integration/*.test.ts",
+    "test:unit": "tsx --test tests/unit/*.test.ts",
+    "fixture": "tsx tests/fixtures/serve.ts",
+    "demo": "tsx examples/demo.ts",
+    "check": "npm run typecheck && npm test && npm run test:installer && npm run build",
+    "prepare": "npm run build",
+    "test:installer": "node --test tests/installer/*.test.mjs"
+  },
+  "dependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "playwright": "^1.63.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0",
+    "@types/node": "^22.20.3",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
+  },
+  "bin": {
+    "usability-mcp": "bin/usability-mcp.mjs"
+  },
+  "files": [
+    "bin/",
+    "dist/src/**/*.js",
+    "README.md"
+  ]
+}

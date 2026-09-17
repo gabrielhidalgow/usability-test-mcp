@@ -1,0 +1,17 @@
+{
+  "target": "http://127.0.0.1:4173",
+  "platform": "web",
+  "persona": {
+    "name": "Alex",
+    "context": "Runs a small business and is comparing accounting software",
+    "technicalConfidence": "average",
+    "productKnowledge": "none",
+    "constraints": ["limited time", "first visit"]
+  },
+  "scenario": "You found this product while searching for simple accounting software.",
+  "goal": "Find the monthly price and reach workspace setup.",
+  "maxActions": 20,
+  "timeoutMs": 180000,
+  "viewport": "desktop",
+  "accessibilityChecks": true
+}

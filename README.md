@@ -8,7 +8,7 @@ Synthetic participants are not real people. Their commentary and completion judg
 
 ## Install once, test from chat
 
-Requires **Node.js 22+**, npm, Git, and the chosen host CLI. The GitHub repository is currently private: installers need repository access and Git authentication. No npm account, model API key or separate model billing is needed.
+Requires **Node.js 22+**, npm, Git, and the chosen host CLI. The GitHub repository is public; installation does not require GitHub authentication. No npm account, model API key or separate model billing is needed.
 
 **Codex:**
 
@@ -102,7 +102,7 @@ Automatic setup supports Codex and Claude Code on macOS/Linux, and Claude Deskto
 
 Claude configurations are merged with a backup when updating an existing entry; unrelated settings remain intact. Codex uses `codex mcp add`. Claude Code registers the server in **user scope** so it is available across projects. Existing entries named `usability` are updated. Reports, screenshots, tokens and local test data are excluded from the distributable.
 
-For a pinned version append `#COMMIT_OR_TAG` to the GitHub package spec. Public distribution requires making the repository public or granting access; no npm registry publication is needed. The repository's `private` package flag prevents accidental npm publishing.
+For a pinned version append `#COMMIT_OR_TAG` to the GitHub package spec. The public GitHub repository supports direct installation; no npm registry publication is needed. The repository's `private` package flag prevents accidental npm publishing.
 
 To uninstall, remove the MCP entry (`codex mcp remove usability` or `claude mcp remove --scope user usability`) and delete the installation's `runtime/` folder. Keep `artifacts/` to retain reports. Shared Playwright browser caches are left intact.
 

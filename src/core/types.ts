@@ -53,7 +53,16 @@ export type JourneyStep = {
   step: number; before: ProductObservation; decision: ParticipantDecision;
   result: ActionResult; after?: ProductObservation;
 };
+export const suggestedChangeSchema = z.strictObject({
+  kind: z.enum(['copy', 'design', 'interaction']),
+  location: z.string().trim().min(1).max(160),
+  proposal: z.string().trim().min(1).max(400),
+  verify: z.string().trim().min(1).max(240),
+  replacement: z.strictObject({ before: z.string().trim().min(1).max(200), after: z.string().trim().min(1).max(200) }).optional(),
+});
+export type SuggestedChange = z.infer<typeof suggestedChangeSchema>;
 export const interpretationSchema = z.strictObject({
+  suggestedChange: suggestedChangeSchema.optional(),
   category: categorySchema, title: z.string(), stepNumbers: z.array(z.number().int().positive()).min(1),
   likelyUsabilityProblem: z.string(), recommendation: z.string(),
   taskImpact: z.enum(['blocked', 'major-delay', 'minor-delay', 'no-task-impact']),
@@ -79,7 +88,7 @@ export type SessionRecord = {
 };
 export type UsabilityReport = {
   id: string; kind: 'session' | 'round'; synthetic: true; generatedAt: string;
-  platform?: 'web' | 'native'; target: string; scenario: string; goal: string; disclaimer: string;
+  platform?: 'web' | 'native'; viewport?: 'desktop' | 'mobile'; target: string; scenario: string; goal: string; disclaimer: string;
   sessions: { id: string; persona: Persona; status: SessionStatus; reason: string;
     continuation?: Continuation; actions: number; wrongTurns: number; backtracks: number; provider: string }[];
   comparison?: import('./comparison.js').Comparison;
@@ -89,4 +98,4 @@ export type UsabilityReport = {
   policyDiagnostics?: (PolicyDiagnostic & { step: number; sessionId: string })[];
 };
 export type RunResult = { session: SessionRecord; report: UsabilityReport; paths: ArtifactPaths };
-export type ArtifactPaths = { directory: string; report: string; json: string; journey: string };
+export type ArtifactPaths = { directory: string; report: string; details: string; json: string; journey: string };

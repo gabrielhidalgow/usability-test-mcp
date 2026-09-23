@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { EvidenceRecorder, artifactIdSchema } from '../evidence/recorder.js';
-import { interpretationSchema, type UsabilityReport, type SessionRecord } from './types.js';
+import { suggestedChangeSchema, interpretationSchema, type UsabilityReport, type SessionRecord } from './types.js';
+import { isGroundedChange, CHANGE_INSTRUCTIONS } from './suggested-change.js';
 import { sessionReport } from './synthesis.js';
 
 const text = z.string().trim().min(1).max(2000);
@@ -9,10 +10,10 @@ const reference = z.strictObject({ sessionId: artifactIdSchema, step: z.number()
 const assessment = z.strictObject({ participantId: artifactIdSchema,
   status: z.enum(['experienced', 'successful', 'not-observed', 'inconclusive']),
   explanation: text, evidence: z.array(reference).max(20) });
-const pattern = z.strictObject({ title: text, screenOrControl: text, obstacle: text,
+const pattern = z.strictObject({ suggestedChange: suggestedChangeSchema.optional(), title: text, screenOrControl: text, obstacle: text,
   findingIds: z.array(z.string().min(1)).min(1).max(40), recommendation: text,
   assessments: z.array(assessment).min(1).max(5) });
-const expertNote = z.strictObject({ title: text, observation: text, recommendation: text,
+const expertNote = z.strictObject({ suggestedChange: suggestedChangeSchema.optional(), title: text, observation: text, recommendation: text,
   evidence: z.array(reference).min(1).max(20) });
 export const reviewSubmissionSchema = z.discriminatedUnion('stage', [
   z.strictObject({ stage: z.literal('participants'), sessions: z.array(z.strictObject({
@@ -56,7 +57,7 @@ const instructions = {
   synthesis: 'Group findings only when the visible screen/control, obstacle and task impact describe the same issue. Titles need not match. Include one assessment per stable participant ID: experienced, successful on the relevant interface, not-observed, or inconclusive. Cite evidence for experienced/successful. Not-observed is not proof of absence. Retain contradictory evidence. Do not merge unrelated obstacles or force consensus; omit doubtful groups to keep their findings ungrouped. No percentages or statistical claims.',
   ux: 'Act as a post-run UX reviewer. Inspect saved screenshots and journeys. Submit evidence-linked UX recommendations, including successful patterns worth preserving. These are expert interpretations, not additional participant observations. Empty notes are valid. Do not infer human emotions, timing, or outcomes from tool failures.',
   content: 'Act as a separate post-run content reviewer. Inspect visible wording and recorded journeys for terminology, clarity, information gaps and helpful content. Cite screenshot/step evidence. Do not invent missing content, emotions or domain facts. These are expert interpretations, not participant observations. Empty notes are valid.',
-  complete: 'Review complete. Report qualitative patterns, successful paths, conflicting/inconclusive evidence, specialist recommendations, and context/profile limitations. These are synthetic journeys, not independent human research.',
+  complete: 'Review complete. Read usability_get_report with format=markdown and present the short executive report, linking details.md rather than pasting the appendix. Report qualitative patterns, successful paths, conflicting/inconclusive evidence, specialist recommendations, and context/profile limitations. These are synthetic journeys, not independent human research.',
 };
 export class ComparisonReviews {
   private busy = new Set<string>();
@@ -69,7 +70,7 @@ export class ComparisonReviews {
   async get(id: string) {
     const report = await this.load(id);
     return { id, revision: report.comparison.revision, stage: report.comparison.nextStage,
-      instructions: instructions[report.comparison.nextStage], report,
+      instructions: instructions[report.comparison.nextStage] + ' ' + CHANGE_INSTRUCTIONS, report,
       nextTool: report.comparison.nextStage === 'complete' ? 'usability_get_report' : 'usability_submit_review',
       screenshotInstructions: 'Call usability_get_review with sessionId and step to view the recorded before/after screenshots. Inspect screenshots before making visual claims.' };
   }
@@ -94,11 +95,18 @@ export class ComparisonReviews {
           if (!step || !step.result.ok || step.result.blocked) throw new ReviewError('Evidence must reference an existing successful, nonblocked step.');
         }
       };
+      const validateChange = (change: z.infer<typeof suggestedChangeSchema> | undefined, refs: z.infer<typeof reference>[]) => {
+        const steps = refs.flatMap(ref => report.journeys.find(j => j.sessionId === ref.sessionId)?.steps.filter(s => s.step === ref.step) ?? []);
+        if (!isGroundedChange(change, steps)) throw new ReviewError('Current copy must match visible text in the cited evidence. Omit replacement when exact wording cannot be verified.');
+      };
       if (submission.stage === 'participants') {
         if (submission.sessions.length !== report.sessions.length || new Set(submission.sessions.map(s => s.sessionId)).size !== report.sessions.length) throw new ReviewError('Supply exactly one entry for each session.');
         for (const entry of submission.sessions) {
           if (!report.sessions.some(s => s.id === entry.sessionId)) throw new ReviewError('Unknown session.');
-          for (const finding of entry.findings) validateEvidence(finding.stepNumbers.map(step => ({ sessionId: entry.sessionId, step })));
+          for (const finding of entry.findings) {
+            const refs = finding.stepNumbers.map(step => ({ sessionId: entry.sessionId, step }));
+            validateEvidence(refs); validateChange(finding.suggestedChange, refs);
+          }
           const record = JSON.parse(await this.recorder.read(entry.sessionId, 'journey')) as SessionRecord;
           const individual = sessionReport(record, entry.findings);
           for (const finding of individual.findings) report.findings.push({ ...finding, id: `${entry.sessionId}:${finding.id}` });
@@ -126,13 +134,14 @@ export class ComparisonReviews {
             if (a.status === 'experienced' && !a.evidence.some(ref => memberEvidence.some(e => e.sessionId === ref.sessionId && e.stepNumbers.includes(ref.step)))) throw new ReviewError('Experienced assessment must cite a member finding.');
             if (memberEvidence.length && a.status !== 'experienced') throw new ReviewError('A member finding requires an experienced assessment; describe successful counterevidence in its explanation.');
           }
+          validateChange(group.suggestedChange, findings.flatMap(f => f.evidence.flatMap(e => e.stepNumbers.map(step => ({ sessionId: e.sessionId, step })))));
           return { ...group, id: `P-${i + 1}`, participantCount: group.assessments.filter(a => a.status === 'experienced').length,
             severity: findings.map(f => f.severity).sort((a,b) => rank[a]! - rank[b]!)[0]! };
         }).sort((a,b) => rank[a.severity]! - rank[b.severity]! || b.participantCount - a.participantCount);
         comparison.ungroupedFindingIds = report.findings.filter(f => !assigned.has(f.id)).map(f => f.id);
         comparison.nextStage = 'ux';
       } else {
-        for (const note of submission.notes) validateEvidence(note.evidence);
+        for (const note of submission.notes) { validateEvidence(note.evidence); validateChange(note.suggestedChange, note.evidence); }
         comparison.reviews[submission.stage] = { status: 'complete', notes: submission.notes };
         comparison.nextStage = submission.stage === 'ux' ? 'content' : 'complete';
       }

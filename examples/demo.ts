@@ -28,6 +28,7 @@ try {
   review = await reviews.submit(round.id, review.revision, { stage: 'synthesis', patterns: [{
     title: 'Pricing is behind Options', screenOrControl: 'Home Options link', obstacle: 'Link label does not name pricing',
     findingIds: review.report.findings.map(f => f.id), recommendation: 'Name the pricing destination',
+    suggestedChange: { kind: 'copy', location: 'Home navigation', proposal: 'Rename the link to identify its destination.', replacement: { before: 'Options', after: 'Pricing' }, verify: 'Repeat the task and check whether visitors find pricing without extra searching.' },
     assessments: review.report.sessions.map(s => ({ participantId: s.id, status: 'experienced', explanation: 'Fixture test double recorded label hesitation', evidence: [{ sessionId: s.id, step: 1 }] })),
   }] });
   for (const stage of ['ux', 'content'] as const) review = await reviews.submit(round.id, review.revision, { stage, notes: [] });

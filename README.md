@@ -50,6 +50,22 @@ The report preserves individual findings and shows successful paths, conflicting
 
 Comparison mode supports desktop and mobile web. Native rounds remain unsupported.
 
+## Short executive report
+
+Every new test writes **`report.md`** as a short decision-making report and **`details.md`** as the full evidence appendix. The executive template contains:
+
+1. **At a glance:** task, scope, reported completion and a compact participant outcome table.
+2. **Recommended actions:** at most five prioritised fixes, with why they matter and screenshot evidence. Journey findings take priority over separate expert suggestions.
+3. **Concrete changes:** the screen/control, proposed copy/design/interaction change, and an observable retest check. Copy changes can show current → proposed wording; current wording must occur in the cited visible text. Suggested wording is not a verified product promise.
+4. **What worked:** up to two supported successes to preserve, including counterexamples to a problem.
+5. **Evidence limits and next check:** incomplete reviews, affected captures or policy restrictions, accessibility coverage, and a clear retest recommendation.
+
+Read it with `usability_get_report` using `format: "markdown"`. Use `format: "details"` for the complete journeys, all recommendations and expert reviews, screenshots and limitations. JSON remains the structured source of evidence. Older saved reports remain readable; `details` can render their JSON when no appendix file exists.
+
+Recommendations may include optional `suggestedChange` fields: `kind` (`copy`, `design`, `interaction`), `location`, `proposal`, `verify`, and optional `replacement: { before, after }`. Do not fabricate exact current copy, implementation effort, owners, prices, clinical claims or promised outcomes. Hosts are instructed to propose specific changes, not generic advice. If no supported change exists, the report says so instead of manufacturing an action list.
+
+Long fields are shortened in the executive view and retained fully in the appendix. Raw participant IDs, full commentary and technical diagnostics stay in the appendix. See [the reusable report outline](docs/REPORT_TEMPLATE.md).
+
 ## Continue an interrupted web test
 
 Ask: **“Continue session-… from where it stopped.”** `usability_continue_session` reads its saved checkpoint after restart, opens the last observed same-origin URL in a fresh browser and includes only that participant's prior decisions/history. It never replays a click, resubmits a form or copies old findings into participant context. Active runs should use `usability_get_session_state`; cancel them before continuing. Completed runs cannot be continued.
@@ -237,12 +253,14 @@ Prompts: `run-usability-test` and `retest-after-fixes`. The retest prompt tells 
     session.json
     report.json
     report.md
+    details.md
     screenshots/0001.png
     accessibility/0000.json
   rounds/round-<uuid>/
     round.json
     report.json
     report.md
+    details.md
 ```
 
 The directory is ignored by Git. Set `USABILITY_ARTIFACT_DIR` to change its root (absolute paths are best for host-launched servers). Journey snapshots are checkpointed before and after actions; timeouts and failures still generate reports. A screenshot is reused as the next action's before-state so evidence stays continuous. Each state gets an axe scan when enabled.

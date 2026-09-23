@@ -75,8 +75,12 @@ test('three quick journeys defer reviews, retain isolated history, and complete 
     assert.equal(fixture.reads(), requests, 'Saved reviews must not rerun browsers');
     const markdown = await client.callTool({ name: 'usability_get_report', arguments: { id, format: 'markdown' } });
     const md = (markdown.content as {text:string}[])[0]!.text;
-    assert.match(md, /Observed in 2 simulated/); assert.match(md, /successful/);
+    assert.match(md, /observed in 2 simulated/); assert.match(md, /successful/);
     assert.match(md, /UX expert review/); assert.match(md, /Content expert review/);
+    const details = await call('usability_get_report', { id, format: 'json' });
+    assert.equal(details.comparison.nextStage, 'complete');
+    const appendix = await client.callTool({ name: 'usability_get_report', arguments: { id, format: 'details' } });
+    assert.match((appendix.content as {text:string}[])[0]!.text, /Participant journeys/);
     assert.equal(fixture.mutations(), 0);
   } finally { await client.close(); await server.close(); await fixture.close(); await rm(root, { recursive: true, force: true }); }
 });

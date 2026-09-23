@@ -30,7 +30,8 @@ export class FixtureProvider implements ReasoningProvider {
     const step = session.journey.find(s => s.decision.friction);
     return step ? [{ title: 'Pricing is hidden behind Options', category: 'navigation', stepNumbers: [step.step],
       likelyUsabilityProblem: 'The label may make pricing harder to recognize.', recommendation: 'Use a label that names the pricing destination.',
-      taskImpact: 'minor-delay', confidence: 'medium' }] : [];
+      taskImpact: 'minor-delay', confidence: 'medium',
+      suggestedChange: { kind: 'copy', location: 'Home navigation', proposal: 'Rename the link to identify its destination.', replacement: { before: 'Options', after: 'Pricing' }, verify: 'Repeat the task and check whether the visitor finds the monthly price without extra searching.' } }] : [];
   }
   async synthesizeReport({ sessions, id }: { sessions: UsabilityReport[]; id: string }) { return synthesizeReports(sessions, id); }
 }

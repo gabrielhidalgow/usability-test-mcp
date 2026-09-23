@@ -1,14 +1,21 @@
+export { renderExecutiveMarkdown as renderMarkdown } from './executive.js';
 import { relative } from 'node:path';
-import type { UsabilityReport } from '../core/types.js';
+import type { SuggestedChange, UsabilityReport } from '../core/types.js';
 import { describeAction } from '../core/action-description.js';
 
 function escape(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/([\\`*_[\]#|])/g, '\\$1').replace(/\n/g, ' ');
 }
-export function renderMarkdown(report: UsabilityReport, directory: string): string {
+function changeDetails(change: SuggestedChange | undefined): string[] {
+  if (!change) return [];
+  return [`Suggested ${change.kind} change — ${escape(change.location)}: ${escape(change.proposal)}`, '',
+    ...(change.replacement ? [`Current → proposed wording: “${escape(change.replacement.before)}” → “${escape(change.replacement.after)}”`, ''] : []),
+    `Verify after the change: ${escape(change.verify)}`, ''];
+}
+export function renderDetailedMarkdown(report: UsabilityReport, directory: string): string {
   const link = (path: string) => `[Screenshot](${relative(directory, path).split('/').map(encodeURIComponent).join('/')})`;
-  const lines = ['# Usability Test Report', '', report.disclaimer, '', '## Test setup', '',
+  const lines = ['# Usability Test — Evidence appendix', '', '[Back to executive report](report.md)', '', report.disclaimer, '', '## Test setup', '',
     `Product: ${escape(report.target)}`, '', `Platform: ${report.platform ?? 'web'}`, '', `Date: ${report.generatedAt}`, '',
     `Scenario: ${escape(report.scenario)}`, '', `Goal: ${escape(report.goal)}`, '',
     '## Executive summary', '',
@@ -41,7 +48,7 @@ export function renderMarkdown(report: UsabilityReport, directory: string): stri
       lines.push(`### ${pattern.id} — ${escape(pattern.title)}`, '',
         `${pattern.severity} · Observed in ${pattern.participantCount} simulated journey(s), counting each participant once.`, '',
         `Interface: ${escape(pattern.screenOrControl)}. Obstacle: ${escape(pattern.obstacle)}`, '',
-        `Recommendation: ${escape(pattern.recommendation)}`, '',
+        `Recommendation: ${escape(pattern.recommendation)}`, '', ...changeDetails(pattern.suggestedChange),
         `Source findings: ${pattern.findingIds.map(escape).join(', ')}`, '',
         '| Participant ID | Observation | Explanation and evidence |', '| --- | --- | --- |');
       for (const a of pattern.assessments) lines.push(`| ${a.participantId} | ${a.status} | ${escape(a.explanation)} ${evidenceLinks(a.evidence)} |`);
@@ -52,7 +59,7 @@ export function renderMarkdown(report: UsabilityReport, directory: string): stri
     for (const role of ['ux', 'content'] as const) {
       const review = comparison.reviews[role];
       lines.push(`## ${role === 'ux' ? 'UX' : 'Content'} expert review`, '', `Status: ${review.status}. Expert interpretations do not count as participant observations.`, '');
-      for (const note of review.notes) lines.push(`### ${escape(note.title)}`, '', escape(note.observation), '', `Recommendation: ${escape(note.recommendation)}`, '', evidenceLinks(note.evidence), '');
+      for (const note of review.notes) lines.push(`### ${escape(note.title)}`, '', escape(note.observation), '', `Recommendation: ${escape(note.recommendation)}`, '', ...changeDetails(note.suggestedChange), evidenceLinks(note.evidence), '');
       if (review.status === 'complete' && !review.notes.length) lines.push('No additional recommendations submitted.', '');
     }
   }
@@ -64,7 +71,7 @@ export function renderMarkdown(report: UsabilityReport, directory: string): stri
       `Participants affected: ${issue.participantsAffected.map(escape).join(', ')}`, '',
       `Observed behaviour: ${escape(issue.observedBehaviour)}`, '',
       `Why this may be a usability problem: ${escape(issue.likelyUsabilityProblem)}`, '',
-      `Recommendation: ${escape(issue.recommendation)}`, '', 'Evidence:', '',
+      `Recommendation: ${escape(issue.recommendation)}`, '', ...changeDetails(issue.suggestedChange), 'Evidence:', '',
       ...issue.evidence.map(e => `- ${e.sessionId}, steps ${e.stepNumbers.join(', ')}: ${e.screenshots.map(link).join(' · ')}`), '');
   }
   lines.push('## Participant journeys', '');

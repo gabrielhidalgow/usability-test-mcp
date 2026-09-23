@@ -1,4 +1,5 @@
 import type { Interpretation, SessionRecord, UsabilityIssue, UsabilityReport } from './types.js';
+import { isGroundedChange } from './suggested-change.js';
 import { describeAction } from './action-description.js';
 
 export const DISCLAIMER = 'These findings come from synthetic participants. Simulated commentary is not real-user evidence, and this does not replace research with real people.';
@@ -14,7 +15,7 @@ export function sessionReport(session: SessionRecord, interpretations: Interpret
     if (!steps.length || interpretation.stepNumbers.some(n => !steps.some(s => s.step === n))) continue;
     const impact = interpretation.taskImpact === 'blocked' && session.status === 'completed'
       ? 'major-delay' : interpretation.taskImpact;
-    findings.push({ ...interpretation, taskImpact: impact,
+    findings.push({ ...interpretation, suggestedChange: isGroundedChange(interpretation.suggestedChange, steps) ? interpretation.suggestedChange : undefined, taskImpact: impact,
       id: `U-${String(findings.length + 1).padStart(3, '0')}`, severity: severityFor(impact),
       observedBehaviour: steps.map(s => `${session.input.persona.name}, step ${s.step}: ${describeAction(s)}; ${s.result.message}. Simulated commentary: ${s.decision.simulatedCommentary}`).join('\n'),
       participantsAffected: [session.input.persona.name],
@@ -24,7 +25,7 @@ export function sessionReport(session: SessionRecord, interpretations: Interpret
   }
   return {
     id: session.id, kind: 'session', synthetic: true, generatedAt: new Date().toISOString(),
-    platform: session.input.platform, target: session.input.target, scenario: session.input.scenario, goal: session.input.goal, disclaimer: DISCLAIMER,
+    platform: session.input.platform, viewport: session.input.platform === 'web' ? session.input.viewport : undefined, target: session.input.target, scenario: session.input.scenario, goal: session.input.goal, disclaimer: DISCLAIMER,
     sessions: [{ id: session.id, continuation: session.continuation, persona: session.input.persona, status: session.status, reason: session.reason,
       actions: session.actions, wrongTurns: session.journey.filter(s => s.decision.behavior === 'wrong-turn').length,
       backtracks: session.journey.filter(s => s.decision.selectedAction.type === 'back').length, provider: session.provider }],

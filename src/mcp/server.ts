@@ -22,7 +22,8 @@ function result(value: object, isError = false): CallToolResult {
 export async function hostStateResult(state: HostState): Promise<CallToolResult> {
   if (state.phase === 'finished') return result({ runId: state.runId, phase: state.phase, status: state.result.status,
     taskOutcomes: state.result.report.sessions, topFindings: state.result.report.findings.slice(0, 5),
-    nextTool: state.result.report.comparison ? 'usability_get_review' : undefined,
+    nextTool: state.result.report.comparison ? 'usability_get_review' : 'usability_get_report',
+    reportInstructions: 'After any pending reviews, read usability_get_report with format=markdown for the short executive report. Present its prioritised actions and link details.md for complete evidence; do not paste full journeys into the executive summary.',
     review: state.result.report.comparison ? { id: state.runId, instructions: 'Read the current saved review status with usability_get_review; this execution response does not track later reviews.' } : undefined,
     artifacts: state.result.paths, policyDiagnostics: state.result.report.policyDiagnostics ?? [], limitations: state.result.report.limitations, synthetic: true });
   if (state.phase === 'error') return result(state, true);
@@ -40,7 +41,7 @@ export async function hostStateResult(state: HostState): Promise<CallToolResult>
     session: pending.session });
 }
 export function createServer(config: AppConfig) {
-  const server = new McpServer({ name: 'usability-test-mcp', version: '0.4.1' }, {
+  const server = new McpServer({ name: 'usability-test-mcp', version: '0.5.0' }, {
     instructions: 'For three perspectives on one task, set participantCount=3. Round journeys finish before interpretation; when finished follow usability_get_review and usability_submit_review through participants, synthesis, ux, content, complete. Reviews use saved evidence and survive restart. Use only the minimal participant packet in fresh host contexts where available; report contextIsolation honestly on the first decision. For a quick test with a supplied URL and goal, use usability_quick_test (device=mobile for mobile web). For native apps use usability_run_native only on an explicitly prepared test device. Continue interrupted web sessions with usability_continue_session; explain that browser state resets and this is a linked segment, not a new participant. For a reusable project, call usability_setup_project, ask the owner its missing questions, draft neutral tasks, save and show the full plan, and approve only after owner review. For an existing project, load its plan and ask what changed or which journey to retest; unchanged approved plans can be reused. Custom boundaries require host oversight; do not run a task that conflicts with them. Use the connected chat model for reasoning; no API key is needed. Start usability_run_session or usability_run_round, inspect the returned screenshot and persona, then call usability_advance_session with ONE decision and the current requestId. Continue until awaiting_findings, submit grounded findings with usability_submit_findings, and repeat until phase=finished. Use a fresh host model context per participant where supported. Never inspect target code or transfer prior findings to participants. Cancel abandoned runs.',
   });
   const recorder = new EvidenceRecorder(config.artifactRoot);
@@ -187,8 +188,8 @@ export function createServer(config: AppConfig) {
     return result(await reviews.submit(id, revision, submission));
   }));
   server.registerTool('usability_get_report', {
-    description: 'Read a saved session or round report by its artifact ID. For profile runs, format=project returns the exact owner-approved setup and success criteria. After the run, compare each criterion with recorded evidence and report observed, not observed, or inconclusive; never infer success without evidence.',
-    inputSchema: z.strictObject({ id: artifactIdSchema, format: z.enum(['json', 'markdown', 'journey', 'project']).default('json') }),
+    description: 'Read a saved session or round report by its artifact ID. markdown is the short executive report; details contains complete findings, journeys and recommendations. For profile runs, format=project returns the exact owner-approved setup and success criteria. After the run, compare each criterion with recorded evidence and report observed, not observed, or inconclusive; never infer success without evidence.',
+    inputSchema: z.strictObject({ id: artifactIdSchema, format: z.enum(['json', 'markdown', 'details', 'journey', 'project']).default('json') }),
     annotations: { readOnlyHint: true, openWorldHint: false },
   }, async ({ id, format }) => {
     try { return { content: [{ type: 'text' as const, text: format === 'project' ? await readFile(join(recorder.paths(id).directory, 'project.json'), 'utf8') : await recorder.read(id, format) }] }; }

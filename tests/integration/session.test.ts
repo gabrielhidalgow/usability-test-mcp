@@ -37,8 +37,11 @@ test('one participant navigates iteratively, stores screenshots and produces axe
     }
     const md = await readFile(run.paths.report, 'utf8');
     assert.match(md, /synthetic participants/);
-    assert.match(md, /Observed behaviour/);
-    assert.match(md, /Why this may be a usability problem/);
+    assert.match(md, /Recommended actions/);
+    assert.match(md, /details.md/);
+    const details = await readFile(run.paths.details, 'utf8');
+    assert.match(details, /Observed behaviour/);
+    assert.match(details, /Why this may be a usability problem/);
     assert.doesNotMatch(md, /overall usability score/i);
     assert.equal(JSON.parse(await readFile(run.paths.journey, 'utf8')).status, 'completed');
     assert.equal(fixture.mutations(), 0);

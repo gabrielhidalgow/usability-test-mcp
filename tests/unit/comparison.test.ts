@@ -37,6 +37,7 @@ test('review rejects invalid evidence and stale changes while preserving pending
       await assert.rejects(f.reviews.submit(f.id, 0, { stage: 'participants', sessions: f.sessions.map(s => ({ sessionId: s.id, findings: [{ ...issue, stepNumbers: [step] }] })) }), /existing successful/);
       assert.equal((await f.reviews.get(f.id)).revision, 0);
     }
+    await assert.rejects(f.reviews.submit(f.id, 0, { stage: 'participants', sessions: f.sessions.map(s => ({ sessionId: s.id, findings: [{ ...issue, suggestedChange: { kind: 'copy', location: 'Home', proposal: 'Rename link', verify: 'Find pricing', replacement: { before: 'Fabricated text', after: 'Pricing' } } }] })) }), /Current copy must match/);
     const submission = { stage: 'participants', sessions: f.sessions.map((s,i) => ({ sessionId: s.id, findings: i < 2 ? [{ ...issue, title: i ? 'Different wording' : issue.title }, ...(i === 0 ? [{ ...issue, title: 'Unrelated paragraph', category: 'content' }] : [])] : [] })) };
     let result = await f.reviews.submit(f.id, 0, submission);
     assert.equal(result.report.findings.length, 3);
@@ -56,6 +57,8 @@ test('review rejects invalid evidence and stale changes while preserving pending
     await assert.rejects(restarted.submit(f.id, 2, { stage: 'ux', notes: [{ title: 'Invalid', observation: 'Tool error', recommendation: 'Fix', evidence: [{ sessionId: f.sessions[0]!.id, step: 2 }] }] }), /existing successful/);
     const md = await f.recorder.read(f.id, 'markdown');
     assert.match(md, /inconclusive/); assert.match(md, /timeout/); assert.match(md, /pending/);
+    await rm(f.recorder.paths(f.id).details);
+    assert.match(await f.recorder.read(f.id, 'details'), /Participant journeys/, 'Legacy reports can render an appendix from JSON');
   } finally { await rm(f.root, { recursive: true, force: true }); }
 });
 

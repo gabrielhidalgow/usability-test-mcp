@@ -9,7 +9,7 @@ import { artifactIdSchema, EvidenceRecorder } from '../evidence/recorder.js';
 import { EVALUATOR_INSTRUCTIONS, PARTICIPANT_INSTRUCTIONS, participantPayload } from '../reasoning/host.js';
 import { HostSessionError, HostSessions, type HostState } from '../core/host-sessions.js';
 import { decisionSchema, interpretationSchema } from '../core/types.js';
-import { ProjectProfiles, projectIdSchema, intakeSchema, planSchema, questions, projectRun } from '../projects/profiles.js';
+import { ProjectProfiles, projectIdSchema, intakeSchema, planSchema, questions, projectRun, projectRunOptionsSchema } from '../projects/profiles.js';
 import { join } from 'node:path';
 import { redact } from '../core/safety.js';
 
@@ -19,7 +19,7 @@ function result(value: object, isError = false): CallToolResult {
 export async function hostStateResult(state: HostState): Promise<CallToolResult> {
   if (state.phase === 'finished') return result({ runId: state.runId, phase: state.phase, status: state.result.status,
     taskOutcomes: state.result.report.sessions, topFindings: state.result.report.findings.slice(0, 5),
-    artifacts: state.result.paths, synthetic: true });
+    artifacts: state.result.paths, policyDiagnostics: state.result.report.policyDiagnostics ?? [], limitations: state.result.report.limitations, synthetic: true });
   if (state.phase === 'error') return result(state, true);
   if (state.phase === 'running') return result({ ...state, nextTool: 'usability_get_session_state' });
   const pending = state.pending;
@@ -83,14 +83,14 @@ export function createServer(config: AppConfig) {
   }, async () => projectResponse(async () => ({ projects: await projects.list() })));
   server.registerTool('usability_run_project', {
     description: 'Run an approved project journey with one participant by default; request three when ready. Check saved boundaries first. Follow returned nextTool until finished. Success criteria and owner context are saved separately for post-run evaluation; do not give them to participants.',
-    inputSchema: z.strictObject({ projectId: projectIdSchema, journeyId: z.string(), participantCount: z.number().int().min(1).max(5).default(1) }),
+    inputSchema: z.strictObject({ projectId: projectIdSchema, journeyId: z.string(), participantCount: z.number().int().min(1).max(5).default(1), options: projectRunOptionsSchema.default({}) }),
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
-  }, async ({ projectId, journeyId, participantCount }, ctx) => {
+  }, async ({ projectId, journeyId, participantCount, options }, ctx) => {
     try {
       const profile = await projects.get(projectId);
-      const run = projectRun(profile, journeyId, participantCount);
+      const run = projectRun(profile, journeyId, participantCount, options);
       const state = await host.start(run.kind, run.input, ctx.mcpReq.signal);
-      await recorder.json(join(recorder.paths(state.runId).directory, 'project.json'), { profile, journeyId, participantCount });
+      await recorder.json(join(recorder.paths(state.runId).directory, 'project.json'), { profile, journeyId, participantCount, options });
       return await hostStateResult(state);
     } catch { return result({ error: 'Could not start project run. Check approval, journey ID and saved persona count.' }, true); }
   });

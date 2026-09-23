@@ -37,13 +37,14 @@ test('ordinary host tool calls drive three isolated participants, return images 
       personas: [1, 2, 3].map(n => ({ name: `Visitor ${n}`, context: 'First-time visitor comparing accounting software' })),
       journeys: [{ id: 'compare', scenario: 'Comparing accounting software', goal: 'Find the monthly price and reach workspace setup.', successCriteria: ['Monthly cost is visible', 'Workspace setup is reached'] }],
     } }));
-    const runArgs = { projectId: savedProfile.profile.id, journeyId: 'compare', participantCount: 3 };
+    const runArgs = { projectId: savedProfile.profile.id, journeyId: 'compare', participantCount: 3, options: { timeoutMs: 30000 } };
     assert.equal((await client.callTool({ name: 'usability_run_project', arguments: runArgs })).isError, true);
     await client.callTool({ name: 'usability_approve_project', arguments: { projectId: savedProfile.profile.id, ownerApproved: true } });
     let response = await client.callTool({ name: 'usability_run_project', arguments: runArgs });
     assert(!JSON.stringify(textPayload(response).participant).includes('Owner-only'));
     const context = textPayload(await client.callTool({ name: 'usability_get_report', arguments: { id: textPayload(response).runId, format: 'project' } }));
     assert.equal(context.profile.id, savedProfile.profile.id);
+    assert.equal(context.options.timeoutMs, 30000);
     const firstPacket = textPayload(response);
     const participantIds = new Set<string>();
     let decisions = 0; let findingsSubmitted = 0; let replayTested = false;

@@ -4,7 +4,7 @@ import { chromium, devices, type Browser, type BrowserContext, type ElementHandl
 import { AxeBuilder } from '@axe-core/playwright';
 import type { Capability } from '../../config/schema.js';
 import { labelCapabilities, permits, redact, safeLocation } from '../../core/safety.js';
-import type { AccessibilityScan, ActionResult, Candidate, EvidenceArtifact, InteractionTarget, ProductObservation } from '../../core/types.js';
+import type { AccessibilityScan, ActionResult, Candidate, EvidenceArtifact, InteractionTarget, PolicyDiagnostic, ProductObservation } from '../../core/types.js';
 import type { DriverStartConfig, ProductDriver } from '../product-driver.js';
 
 type TargetEntry = { element: ElementHandle<Node>; candidate: Candidate };
@@ -19,6 +19,8 @@ export class PlaywrightProductDriver implements ProductDriver {
   private observationSequence = 0;
   private activeCapability: Capability | null = null;
   private denied: string[] = [];
+  private policyDiagnostics: PolicyDiagnostic[] = [];
+  takePolicyDiagnostics(): PolicyDiagnostic[] { return this.policyDiagnostics.splice(0); }
   private dialogs: string[] = [];
   private abortListener?: () => void;
   constructor(private readonly headless = true) {}
@@ -38,19 +40,31 @@ export class PlaywrightProductDriver implements ProductDriver {
       // Do not let WebSockets bypass HTTP mutation guards.
       await this.context.routeWebSocket('**/*', socket => socket.close());
       const origin = new URL(config.input.target).origin;
-      const blockedUrl = (url: URL, navigation: boolean) => {
+      const blockedUrl = (url: URL, navigation: boolean): PolicyDiagnostic['reason'] | null => {
         let path = url.pathname;
         try { path = decodeURIComponent(path); } catch { /* Treat malformed escapes literally. */ }
-        return !['http:', 'https:'].includes(url.protocol) || Boolean(url.username || url.password) ||
-          (navigation && url.origin !== origin) || labelCapabilities(path.replace(/[-_/]/g, ' ')).some(c => !permits(config.input, c));
+        if (!['http:', 'https:'].includes(url.protocol)) return 'unsupported-protocol';
+        if (url.username || url.password) return 'credentialed-url';
+        if (navigation && url.origin !== origin) return 'cross-origin-navigation';
+        if (labelCapabilities(path.replace(/[-_/]/g, ' ')).some(c => !permits(config.input, c))) return 'capability-denied';
+        return null;
       };
       await this.context.route('**/*', async route => {
         const request = route.request();
         const url = new URL(request.url());
         const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(request.method());
-        if (blockedUrl(url, request.isNavigationRequest()) || (mutation &&
-          (url.origin !== origin || !this.activeCapability || !permits(config.input, this.activeCapability)))) {
-          this.denied.push('A request was blocked by the session safety policy.');
+        const mainFrameNavigation = request.isNavigationRequest() && request.frame() === this.page?.mainFrame();
+        const deny = (reason: PolicyDiagnostic['reason'], phase: PolicyDiagnostic['phase']) => {
+          // Still block every forbidden request. Only navigations in the tested page
+          // and mutations stop the journey; failed assets/frames reduce fidelity.
+          const stopsJourney = mainFrameNavigation || mutation;
+          this.policyDiagnostics.push({ reason, phase, method: request.method(), resourceType: request.resourceType(), mainFrameNavigation, stopsJourney });
+          if (stopsJourney) this.denied.push(`Session safety policy blocked ${reason} (${phase}).`);
+        };
+        const reason = blockedUrl(url, request.isNavigationRequest()) ?? (mutation &&
+          (url.origin !== origin || !this.activeCapability || !permits(config.input, this.activeCapability)) ? 'mutation-denied' : null);
+        if (reason) {
+          deny(reason, 'request');
           await route.abort('blockedbyclient');
         } else if (request.isNavigationRequest()) {
           // Playwright's continue() may follow redirects without re-running this handler.
@@ -59,7 +73,7 @@ export class PlaywrightProductDriver implements ProductDriver {
             const response = await route.fetch({ maxRedirects: 0, timeout: 15000 });
             const location = response.headers()['location'];
             if (location && response.status() >= 300 && response.status() < 400 && blockedUrl(new URL(location, url), true)) {
-              this.denied.push('A redirect was blocked by the session safety policy.');
+              deny(blockedUrl(new URL(location, url), true)!, 'redirect');
               await route.abort('blockedbyclient');
             } else await route.fulfill({ response });
             await response.dispose();

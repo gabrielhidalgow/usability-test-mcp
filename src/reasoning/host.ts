@@ -12,7 +12,7 @@ Keyboard mode uses Tab/Shift+Tab/Enter/Space/Escape/arrows and typing into the f
 Use a fresh host model context for each participant when the host supports it. The server isolates browser state but cannot erase your existing chat context. Do not use implementation knowledge from this conversation.`;
 
 export const EVALUATOR_INSTRUCTIONS = `The participant session is finished. Interpret ONLY its recorded actions, results, visible evidence, and simulated commentary. Submit at most 8 meaningful issues with actual step numbers; an empty array is valid.
-Keep interpretations and recommendations separate from observable behavior. Do not invent issues, human feelings, or visual conclusions unsupported by screenshots. Harness safety blocks, time limits, and infrastructure errors are not product usability issues. No score or statistical claims.`;
+Keep interpretations and recommendations separate from observable behavior. Do not invent issues, human feelings, or visual conclusions unsupported by screenshots. Harness safety blocks, time limits, and infrastructure errors are not product usability issues. Inspect policyDiagnostics and warnings: missing or altered content may be caused by blocked background resources, so do not attribute it to the product without independent evidence. No score or statistical claims.`;
 
 export type PendingRequest =
   | { phase: 'awaiting_decision'; requestId: string; input: ParticipantDecisionInput; submit: (value: ParticipantDecision) => void }

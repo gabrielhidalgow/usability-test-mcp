@@ -56,7 +56,32 @@ test('caller cancellation and startup failure produce distinct outcomes with cle
     assert.equal(cancelled.session.status, 'cancelled');
     stub.driver.start = async () => { throw new Error('private backend details sk-should-not-leak'); };
     const failed = await runner.run(input, new FixtureProvider());
+    assert.equal(failed.session.failureStage, 'startup');
+    assert.match(failed.session.reason, /during startup/);
     assert.equal(failed.session.status, 'error'); assert.equal(stub.stops(), 2);
     assert(!(await readFile(failed.paths.json, 'utf8')).includes('sk-should-not-leak'));
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('a write blocked while awaiting a decision cannot be reported as completed', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'usability-late-block-'));
+  const stub = stubDriver();
+  let pendingBlock = false;
+  stub.driver.takePolicyDiagnostics = () => {
+    if (!pendingBlock) return [];
+    pendingBlock = false;
+    return [{ reason: 'mutation-denied', phase: 'request', method: 'POST', resourceType: 'fetch', mainFrameNavigation: false, stopsJourney: true }];
+  };
+  const provider = new FixtureProvider();
+  provider.decideNextAction = async () => {
+    pendingBlock = true;
+    return makeDecision({ type: 'finish', outcome: 'completed', reason: 'Done', visibleEvidence: 'Fake page' });
+  };
+  try {
+    const run = await new SessionOrchestrator(new EvidenceRecorder(root), () => stub.driver).run(input, provider);
+    assert.equal(run.session.status, 'blocked');
+    assert.equal(run.session.actions, 0);
+    assert.equal(run.report.policyDiagnostics?.[0]?.reason, 'mutation-denied');
+    assert.equal(run.report.findings.length, 0);
   } finally { await rm(root, { recursive: true, force: true }); }
 });

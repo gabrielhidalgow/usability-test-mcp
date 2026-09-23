@@ -36,6 +36,11 @@ export type ProductObservation = {
   viewport: { width: number; height: number }; screenshot: EvidenceArtifact;
   dialogs: string[];
 };
+export type PolicyDiagnostic = {
+  reason: 'unsupported-protocol' | 'credentialed-url' | 'cross-origin-navigation' | 'capability-denied' | 'mutation-denied';
+  phase: 'request' | 'redirect'; method: string; resourceType: string;
+  mainFrameNavigation: boolean; stopsJourney: boolean;
+};
 export type ActionResult = { ok: boolean; message: string; blocked?: boolean };
 export type AxeFinding = { id: string; impact: string | null; description: string; helpUrl: string; targets: string[] };
 export type AccessibilityScan = { step: number; screenshot: string; findings: AxeFinding[]; error?: string };
@@ -61,6 +66,8 @@ export type SessionRecord = {
   input: SessionInput; provider: string; status: SessionStatus; reason: string;
   actions: number; journey: JourneyStep[]; initialObservation?: ProductObservation;
   accessibility: AccessibilityScan[]; warnings: string[];
+  policyDiagnostics?: (PolicyDiagnostic & { step: number })[];
+  failureStage?: string;
 };
 export type UsabilityReport = {
   id: string; kind: 'session' | 'round'; synthetic: true; generatedAt: string;
@@ -70,6 +77,7 @@ export type UsabilityReport = {
   findings: UsabilityIssue[]; accessibility: (AccessibilityScan & { sessionId: string })[];
   journeys: { sessionId: string; steps: JourneyStep[] }[];
   limitations: string[];
+  policyDiagnostics?: (PolicyDiagnostic & { step: number; sessionId: string })[];
 };
 export type RunResult = { session: SessionRecord; report: UsabilityReport; paths: ArtifactPaths };
 export type ArtifactPaths = { directory: string; report: string; json: string; journey: string };

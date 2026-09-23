@@ -31,6 +31,8 @@ async function execute(driver: ProductDriver, action: Action): Promise<ActionRes
   }
 }
 
+class PolicyBlocked extends Error {}
+
 export class SessionOrchestrator {
   constructor(private readonly recorder: EvidenceRecorder, private readonly driverFactory: () => ProductDriver) {}
 
@@ -46,25 +48,48 @@ export class SessionOrchestrator {
       input: { ...input, target: safeLocation(input.target) }, provider: provider.name, status: 'incomplete',
       reason: 'Session has not completed', actions: 0, journey: [], accessibility: [], warnings: [...(provider.limitations ?? [])] };
     let interpretations: Interpretation[] = [];
+    let stage = 'startup';
+    const collectPolicy = (stopOnBlock = true) => {
+      const events = driver.takePolicyDiagnostics?.() ?? [];
+      record.policyDiagnostics ??= [];
+      record.policyDiagnostics.push(...events.map(event => ({ ...event, step: record.actions })));
+      if (events.some(e => !e.stopsJourney) && !record.warnings.includes('Background resources were blocked by safety policy; rendered content may differ from a normal browser.')) {
+        record.warnings.push('Background resources were blocked by safety policy; rendered content may differ from a normal browser.');
+      }
+      const fatal = events.find(e => e.stopsJourney);
+      if (fatal) {
+        const message = `Session safety policy blocked ${fatal.reason} (${fatal.phase}).`;
+        const step = record.journey.at(-1);
+        if (step) step.result = { ok: false, blocked: true, message };
+        if (stopOnBlock) throw new PolicyBlocked(message);
+        if (!['error', 'cancelled', 'timeout'].includes(record.status)) { record.status = 'blocked'; record.reason = message; }
+      }
+    };
     const run = <T>(fn: () => Promise<T>) => withAbort(fn, signal);
     const scan = async (observation: ProductObservation, step: number) => {
       if (!input.accessibilityChecks) return;
+      stage = 'accessibility';
       const result = await run(() => driver.scanAccessibility(step, observation.screenshot.path));
       record.accessibility.push(result);
       await this.recorder.json(join(paths.directory, 'accessibility', `${String(step).padStart(4, '0')}.json`), result);
     };
     try {
       await run(() => driver.start({ input, directory: paths.directory, signal }));
+      stage = 'observation';
       let observation = await run(() => driver.getObservation());
       record.initialObservation = observation;
+      collectPolicy();
       await this.recorder.checkpoint(record);
       await scan(observation, 0);
       while (true) {
+        collectPolicy();
+        stage = 'participant-reasoning';
         const decision = decisionSchema.parse(await run(() => provider.decideNextAction({
           sessionId: id,
           persona: input.persona, scenario: input.scenario, goal: input.goal, interactionMode: input.interactionMode,
           observation, history: record.journey, signal,
         })));
+        collectPolicy();
         const action = decision.selectedAction;
         const step: JourneyStep = { step: record.journey.length + 1, before: observation, decision,
           result: { ok: false, message: 'Action not executed' } };
@@ -90,9 +115,12 @@ export class SessionOrchestrator {
         // Save the intended action before execution so failures retain the evidence trail.
         await this.recorder.checkpoint(record);
         record.actions++;
+        stage = 'action';
         step.result = await run(() => execute(driver, action));
+        stage = 'observation';
         observation = await run(() => driver.getObservation());
         step.after = observation;
+        collectPolicy();
         driver.setActionCapability(null);
         await this.recorder.checkpoint(record);
         if (step.result.blocked) {
@@ -101,13 +129,15 @@ export class SessionOrchestrator {
         await scan(observation, record.actions);
       }
     } catch (error) {
-      record.status = externalSignal?.aborted ? 'cancelled' : deadline.signal.aborted ? 'timeout' : 'error';
-      record.reason = record.status === 'cancelled' ? 'Session cancelled by caller' : record.status === 'timeout'
-        ? 'Session deadline exceeded' : 'Session could not continue: browser, target, or reasoning provider unavailable or invalid output.';
+      if (!(error instanceof PolicyBlocked)) record.failureStage = stage;
+      record.status = error instanceof PolicyBlocked ? 'blocked' : externalSignal?.aborted ? 'cancelled' : deadline.signal.aborted ? 'timeout' : 'error';
+      record.reason = error instanceof PolicyBlocked ? error.message : record.status === 'cancelled' ? 'Session cancelled by caller' : record.status === 'timeout'
+        ? 'Session deadline exceeded' : `Session could not continue during ${stage}; inspect the saved journey and local setup.`;
       if (error instanceof Error && error.message.startsWith('Browser startup')) record.reason = error.message;
     } finally {
       driver.setActionCapability(null);
       await driver.stop();
+      collectPolicy(false);
     }
     // Interpretation cannot turn an infrastructure failure into a product usability finding.
     if (!signal.aborted && !['error', 'blocked'].includes(record.status) && record.journey.some(s => s.result.ok)) {

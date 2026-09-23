@@ -1,10 +1,11 @@
 import type { SessionInput } from '../config/schema.js';
 import type { AccessibilityScan, AccessibilitySnapshot, ActionResult, EvidenceArtifact,
-  InteractionTarget, ProductObservation } from '../core/types.js';
+  InteractionTarget, PolicyDiagnostic, ProductObservation } from '../core/types.js';
 
 export type DriverStartConfig = { input: SessionInput; directory: string; signal: AbortSignal };
 export interface ProductDriver {
   readonly kind: 'web' | 'mobile';
+  takePolicyDiagnostics?(): PolicyDiagnostic[];
   start(config: DriverStartConfig): Promise<void>;
   stop(): Promise<void>;
   getObservation(): Promise<ProductObservation>;

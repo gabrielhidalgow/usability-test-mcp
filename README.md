@@ -234,3 +234,24 @@ Use `usability_list_projects` to find profiles and `usability_setup_project` wit
 After the run, the host compares the saved success criteria with journey evidence, marking each **observed**, **not observed**, or **inconclusive**, with evidence references. This comparison is host-generated; the saved core report retains its existing task outcomes and evidence-linked findings. Owner priorities and evaluator criteria are excluded from participant tool payloads. Host context isolation still depends on the chat product; exclusion from a payload cannot erase information already in the conversation.
 
 Profile runs retain default-deny consequential-action protection. Written custom boundaries require host oversight and are not automatically translated into browser restrictions. Keep tasks consistent with those boundaries. Do not put credentials in profiles; authentication setup is not automated. These are synthetic participants, not recruited people.
+
+## Diagnosing interrupted tests
+
+Reports and final MCP responses now include **browser policy diagnostics**: the reason category, request method, resource type, request/redirect phase, and whether the block stops the journey. These diagnostics omit request URLs, query strings, credentials, headers and response bodies. They belong to the evaluator/report, not the participant's observation payload.
+
+Forbidden requests remain blocked. Blocks of passive resources (such as an image or embedded frame) can now let the journey continue, with an explicit warning that the page may differ from an ordinary browser. Blocked main-frame navigation and unapproved write requests still stop the run. Do not turn missing content caused by these restrictions into a website usability finding. Diagnostics cover HTTP request/redirect policy decisions; they are not a complete browser-network trace.
+
+Generic execution failures also record their stage, such as startup, observation, action or participant reasoning. The earlier slow-navigation fix waits longer for clicks and retries observations when navigation replaces the document; it never repeats the participant's action automatically.
+
+Saved-project runs accept an optional `options` object with `timeoutMs` (up to 600000), `maxActions`, `accessibilityChecks`, `viewport`, and `interactionMode`. For example:
+
+```json
+{
+  "projectId": "project-<saved-id>",
+  "journeyId": "understand-adhd",
+  "participantCount": 1,
+  "options": { "timeoutMs": 600000, "accessibilityChecks": false }
+}
+```
+
+These options are recorded alongside the approved plan in the run's `project.json`. They do not enable consequential capabilities or change the plan's target, persona, scenario or goal. Browser state still cannot resume after a stopped run or server restart; a continuation must be explicitly reported as a new session, not as an uninterrupted journey or an independent new participant.

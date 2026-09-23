@@ -28,6 +28,7 @@ export function sessionReport(session: SessionRecord, interpretations: Interpret
     sessions: [{ id: session.id, persona: session.input.persona, status: session.status, reason: session.reason,
       actions: session.actions, wrongTurns: session.journey.filter(s => s.decision.behavior === 'wrong-turn').length,
       backtracks: session.journey.filter(s => s.decision.selectedAction.type === 'back').length, provider: session.provider }],
+    policyDiagnostics: (session.policyDiagnostics ?? []).map(d => ({ ...d, sessionId: session.id })),
     findings: findings.sort((a, b) => rank[a.severity] - rank[b.severity]),
     accessibility: session.accessibility.map(s => ({ ...s, sessionId: session.id })),
     journeys: [{ sessionId: session.id, steps: session.journey }],
@@ -64,6 +65,7 @@ export function synthesizeReports(reports: UsabilityReport[], id: string): Usabi
   findings.forEach((f, i) => { f.id = `U-${String(i + 1).padStart(3, '0')}`; });
   return { ...first, id, kind: 'round', generatedAt: new Date().toISOString(),
     sessions: reports.flatMap(r => r.sessions), findings,
+    policyDiagnostics: reports.flatMap(r => r.policyDiagnostics ?? []),
     accessibility: reports.flatMap(r => r.accessibility), journeys: reports.flatMap(r => r.journeys),
     limitations: [...new Set(reports.flatMap(r => r.limitations)),
       'Recurrence is qualitative, not statistically significant. Clustering matches category and normalized title; related findings with different titles remain separate.'],

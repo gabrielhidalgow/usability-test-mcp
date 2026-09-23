@@ -40,6 +40,11 @@ export function renderMarkdown(report: UsabilityReport, directory: string): stri
     }
     lines.push('');
   }
+  if (report.policyDiagnostics?.length) {
+    lines.push('', '## Browser policy diagnostics', '', 'These are harness restrictions, not product usability findings. No request URLs or response bodies are stored.', '',
+      '| Session | Step | Reason | Method / resource | Effect |', '| --- | --- | --- | --- | --- |');
+    for (const d of report.policyDiagnostics) lines.push(`| ${escape(d.sessionId)} | ${d.step} | ${d.reason} (${d.phase}) | ${escape(d.method)} / ${escape(d.resourceType)} | ${d.stopsJourney ? 'Stops journey' : 'Resource blocked; journey may continue with reduced fidelity'} |`);
+  }
   lines.push('', '## Accessibility findings', '', '### Automated', '');
   if (!report.accessibility.length) lines.push('No automated scans were completed.');
   for (const scan of report.accessibility) {

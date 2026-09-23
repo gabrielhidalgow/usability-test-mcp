@@ -2,7 +2,7 @@ import { mkdir, readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { personaSchema, sessionInputSchema, roundInputSchema, isHttpUrlWithoutCredentials } from '../config/schema.js';
+import { personaSchema, sessionBaseSchema, sessionInputSchema, roundInputSchema, isHttpUrlWithoutCredentials } from '../config/schema.js';
 import { EvidenceRecorder } from '../evidence/recorder.js';
 
 const answer = z.string().trim().min(1).max(2000);
@@ -57,13 +57,15 @@ export class ProjectProfiles {
     return profile;
   }
 }
-export function projectRun(profile: ProjectProfile, journeyId: string, participantCount: number) {
+export const projectRunOptionsSchema = sessionBaseSchema.pick({ timeoutMs: true, maxActions: true, accessibilityChecks: true, viewport: true, interactionMode: true }).partial();
+export function projectRun(profile: ProjectProfile, journeyId: string, participantCount: number, options: unknown = {}) {
+  const settings = projectRunOptionsSchema.parse(options);
   if (!profile.approvedAt) throw new Error('Review and approve this draft plan before running it.');
   const journey = profile.plan.journeys.find(j => j.id === journeyId);
   if (!journey) throw new Error('Choose a journey ID from the saved plan.');
   if (!Number.isInteger(participantCount) || participantCount < 1 || participantCount > profile.plan.personas.length) throw new Error('The plan needs one persona per requested participant.');
   // Owner priorities, evaluator criteria, and suggested routes never enter participant inputs.
-  const task = { target: profile.plan.target, scenario: journey.scenario, goal: journey.goal };
+  const task = { ...settings, target: profile.plan.target, scenario: journey.scenario, goal: journey.goal };
   return participantCount === 1
     ? { kind: 'session' as const, input: sessionInputSchema.parse({ ...task, persona: profile.plan.personas[0] }) }
     : { kind: 'round' as const, input: roundInputSchema.parse({ ...task, participantCount, personas: profile.plan.personas.slice(0, participantCount) }) };

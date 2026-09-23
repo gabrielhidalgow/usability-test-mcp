@@ -20,6 +20,12 @@ test('profiles persist, edits need review, and participant inputs exclude owner 
     const reloaded = await new ProjectProfiles(root).get(draft.id);
     const run = projectRun(reloaded, 'pricing', 1);
     assert.equal(run.kind, 'session');
+    const configured = projectRun(reloaded, 'pricing', 1, { timeoutMs: 600000, accessibilityChecks: false, viewport: 'mobile' });
+    assert.equal(configured.input.timeoutMs, 600000);
+    assert.equal(configured.input.accessibilityChecks, false);
+    assert.equal(configured.input.viewport, 'mobile');
+    assert.throws(() => projectRun(reloaded, 'pricing', 1, { allowedCapabilities: ['payment'], testEnvironment: true }));
+    assert.throws(() => projectRun(reloaded, 'pricing', 1, { timeoutMs: 999999 }));
     assert.equal(run.input.testEnvironment, false);
     assert.deepEqual(run.input.allowedCapabilities, []);
     assert(!JSON.stringify(run.input).includes('Private business goal'));

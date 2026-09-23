@@ -55,6 +55,7 @@ test('unapproved POST is blocked even when a button label looks harmless', async
       .run({ ...fixtureInput(fixture.url + '/safety'), accessibilityChecks: false }, provider);
     assert.equal(run.session.status, 'blocked');
     assert.equal(fixture.mutations(), 0);
+    assert(run.report.policyDiagnostics?.some(d => d.reason === 'mutation-denied' && d.stopsJourney));
     assert.equal(run.report.findings.length, 0);
   } finally { await fixture.close(); await rm(root, { recursive: true, force: true }); }
 });
@@ -106,5 +107,37 @@ test('slow document navigation is observed without replaying the click', async (
     assert.equal(run.session.status, 'completed', run.session.reason);
     assert.equal(run.session.journey[0]?.result.ok, true);
     assert.equal(destinationReads, 1);
+  } finally { await new Promise<void>(resolve => site.close(() => resolve())); await rm(root, { recursive: true, force: true }); }
+});
+
+
+test('blocked passive resources are diagnosed without ending a readable journey or leaking request data', async () => {
+  let prohibitedReads = 0;
+  const site = createServer((request, response) => {
+    if (request.url?.startsWith('/share/')) prohibitedReads++;
+    response.setHeader('Content-Type', 'text/html');
+    response.end(request.url === '/article'
+      ? '<h1>Explanation available</h1><img src="/share/image.png?token=private-canary"><iframe src="http://127.0.0.1:1/blocked"></iframe>'
+      : '<a href="/article">Read explanation</a>');
+  });
+  await new Promise<void>(resolve => site.listen(0, '127.0.0.1', resolve));
+  const address = site.address(); assert(address && typeof address !== 'string');
+  const root = await mkdtemp(join(tmpdir(), 'usability-policy-resources-'));
+  try {
+    const provider = new FixtureProvider();
+    provider.decideNextAction = async ({ observation }) => observation.visibleText.includes('Explanation available')
+      ? makeDecision({ type: 'finish', outcome: 'completed', reason: 'Explanation reached', visibleEvidence: 'Explanation available' })
+      : makeDecision({ type: 'click', target: observation.candidates.find(c => c.name === 'Read explanation')!.ref, capability: null });
+    provider.evaluateObservation = async () => [];
+    const run = await new SessionOrchestrator(new EvidenceRecorder(root), () => new PlaywrightProductDriver())
+      .run({ ...fixtureInput(`http://127.0.0.1:${address.port}`), accessibilityChecks: false }, provider);
+    assert.equal(run.session.status, 'completed', run.session.reason);
+    assert.equal(prohibitedReads, 0, 'Blocked resource reached the server');
+    assert(run.report.policyDiagnostics?.some(d => d.reason === 'capability-denied' && d.resourceType === 'image' && !d.stopsJourney));
+    assert(run.report.policyDiagnostics?.some(d => d.reason === 'cross-origin-navigation' && !d.mainFrameNavigation && !d.stopsJourney));
+    assert(!JSON.stringify(run.report.policyDiagnostics).includes('private-canary'));
+    assert(run.report.limitations.some(l => l.includes('Background resources')));
+    assert.match(await readFile(run.paths.report, 'utf8'), /Browser policy diagnostics/);
+    assert.equal(run.report.findings.length, 0);
   } finally { await new Promise<void>(resolve => site.close(() => resolve())); await rm(root, { recursive: true, force: true }); }
 });

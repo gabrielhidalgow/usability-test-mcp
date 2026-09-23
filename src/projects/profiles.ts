@@ -10,7 +10,7 @@ export const projectIdSchema = z.string().regex(/^project-[0-9a-f-]{36}$/);
 export const intakeSchema = z.strictObject({ purpose: answer, audience: answer, priority: answer, success: answer, boundaries: answer });
 export const questions = {
   purpose: 'What does the product help people do?',
-  audience: 'Who are its main users, and what experience or constraints matter?',
+  audience: 'Who are its main users, what knowledge and information needs differ, and which details come from research versus assumptions?',
   priority: 'Which user outcome or journey matters most for this test?',
   success: 'What visible evidence would show that the user succeeded?',
   boundaries: 'What is safe to test, and what must be avoided? Do not include passwords or secrets.',

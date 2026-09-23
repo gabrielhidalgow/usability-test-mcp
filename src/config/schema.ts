@@ -16,6 +16,8 @@ export const personaSchema = z.strictObject({
   context: z.string().min(1).max(2000),
   technicalConfidence: z.enum(['low', 'average', 'high']).default('average'),
   productKnowledge: z.enum(['none', 'some', 'experienced']).default('none'),
+  basis: z.enum(['owner-research', 'assumption', 'unspecified']).optional(),
+  informationNeeds: z.array(z.string().min(1).max(300)).max(10).optional(),
   constraints: z.array(z.string().max(300)).max(10).default([]),
 });
 export const sessionBaseSchema = z.strictObject({

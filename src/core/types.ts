@@ -14,7 +14,9 @@ export const actionSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('back') }),
   z.strictObject({ type: z.literal('finish'), outcome: z.enum(['completed', 'incomplete', 'blocked']), reason: z.string(), visibleEvidence: z.string() }),
 ]);
+export const isolationSchema = z.enum(['shared', 'host-reported fresh', 'unknown']);
 export const decisionSchema = z.strictObject({
+  contextIsolation: isolationSchema.optional(),
   stateSummary: z.string().max(2000),
   simulatedCommentary: z.string().max(2000),
   userExpectation: z.string().max(1000).nullable(),
@@ -80,6 +82,7 @@ export type UsabilityReport = {
   platform?: 'web' | 'native'; target: string; scenario: string; goal: string; disclaimer: string;
   sessions: { id: string; persona: Persona; status: SessionStatus; reason: string;
     continuation?: Continuation; actions: number; wrongTurns: number; backtracks: number; provider: string }[];
+  comparison?: import('./comparison.js').Comparison;
   findings: UsabilityIssue[]; accessibility: (AccessibilityScan & { sessionId: string })[];
   journeys: { sessionId: string; steps: JourneyStep[] }[];
   limitations: string[];

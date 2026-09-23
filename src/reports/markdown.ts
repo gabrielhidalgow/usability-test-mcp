@@ -21,8 +21,43 @@ export function renderMarkdown(report: UsabilityReport, directory: string): stri
   for (const s of report.sessions) lines.push(`| ${escape(s.persona.name)} | ${s.status} | ${s.actions} | ${s.wrongTurns} | ${s.backtracks} |`);
   for (const s of report.sessions) lines.push('', `${escape(s.persona.name)} — ${escape(s.reason)} (provider: ${escape(s.provider)})`);
   for (const s of report.sessions) if (s.continuation) lines.push('', `Continuation of ${s.continuation.previousSessionId}. Browser state reset; previous actions were not replayed. This segment is not an independent participant.${s.continuation.uncertainAction ? ' The last action in the prior segment had an uncertain result.' : ''}`);
+  if (report.comparison) {
+    const comparison = report.comparison;
+    const evidenceLinks = (refs: { sessionId: string; step: number }[]) => refs.map(ref => {
+      const step = report.journeys.find(j => j.sessionId === ref.sessionId)?.steps.find(s => s.step === ref.step);
+      return `${ref.sessionId}, step ${ref.step}${step ? `: ${link(step.before.screenshot.path)}${step.after ? ` → ${link(step.after.screenshot.path)}` : ''}` : ''}`;
+    }).join(' · ');
+    lines.push('', '## Participant comparison', '', `Review status: ${comparison.nextStage === 'complete' ? 'complete' : `pending — ${comparison.nextStage}`}.`, '',
+      'These are synthetic perspectives. Shared model biases can recur; context isolation is host-reported and not verified.', '',
+      '| Participant ID | Profile | Basis | Model context | Outcome |', '| --- | --- | --- | --- | --- |');
+    for (const participant of comparison.participants) {
+      const sessions = report.sessions.filter(s => participant.sessionIds.includes(s.id));
+      lines.push(`| ${participant.participantId} | ${escape(participant.name)} | ${participant.basis} | ${participant.contextIsolation} | ${sessions.map(s => s.status).join(', ')} |`);
+    }
+    for (const s of report.sessions) lines.push('', `${escape(s.persona.name)} (${s.id}): ${escape(s.persona.context)}. Prior knowledge: ${s.persona.productKnowledge}; technical confidence: ${s.persona.technicalConfidence}. Information needs: ${(s.persona.informationNeeds ?? []).map(escape).join('; ') || 'unspecified'}. Constraints: ${s.persona.constraints.map(escape).join('; ') || 'none supplied'}.`);
+    lines.push('', '## Patterns and counterevidence', '');
+    if (!comparison.patterns.length) lines.push(comparison.nextStage === 'participants' || comparison.nextStage === 'synthesis' ? 'Pattern review is pending; no conclusion about recurrence is available.' : 'No shared patterns were submitted. Individual findings remain below.');
+    for (const pattern of comparison.patterns) {
+      lines.push(`### ${pattern.id} — ${escape(pattern.title)}`, '',
+        `${pattern.severity} · Observed in ${pattern.participantCount} simulated journey(s), counting each participant once.`, '',
+        `Interface: ${escape(pattern.screenOrControl)}. Obstacle: ${escape(pattern.obstacle)}`, '',
+        `Recommendation: ${escape(pattern.recommendation)}`, '',
+        `Source findings: ${pattern.findingIds.map(escape).join(', ')}`, '',
+        '| Participant ID | Observation | Explanation and evidence |', '| --- | --- | --- |');
+      for (const a of pattern.assessments) lines.push(`| ${a.participantId} | ${a.status} | ${escape(a.explanation)} ${evidenceLinks(a.evidence)} |`);
+      lines.push('');
+    }
+    lines.push('Not-observed is not proof of absence. Successful paths and conflicting evidence are retained in the assessments and journeys.', '',
+      `Ungrouped individual findings: ${comparison.ungroupedFindingIds.map(escape).join(', ') || 'none currently recorded'}.`, '');
+    for (const role of ['ux', 'content'] as const) {
+      const review = comparison.reviews[role];
+      lines.push(`## ${role === 'ux' ? 'UX' : 'Content'} expert review`, '', `Status: ${review.status}. Expert interpretations do not count as participant observations.`, '');
+      for (const note of review.notes) lines.push(`### ${escape(note.title)}`, '', escape(note.observation), '', `Recommendation: ${escape(note.recommendation)}`, '', evidenceLinks(note.evidence), '');
+      if (review.status === 'complete' && !review.notes.length) lines.push('No additional recommendations submitted.', '');
+    }
+  }
   lines.push('', '## Most important findings', '');
-  if (!report.findings.length) lines.push('No evidence-linked usability issues were reported. This is not evidence that the product has no issues.');
+  if (!report.findings.length) lines.push(report.comparison?.nextStage === 'participants' ? 'Participant interpretation is pending.' : 'No evidence-linked usability issues were reported. This is not evidence that the product has no issues.');
   for (const issue of report.findings) {
     lines.push(`### ${issue.id} — ${escape(issue.title)}`, '',
       `Severity: ${issue.severity} · Task impact: ${issue.taskImpact} · Interpretation confidence: ${issue.confidence}`, '',

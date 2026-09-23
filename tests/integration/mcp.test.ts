@@ -8,7 +8,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { createServer } from '../../src/mcp/server.js';
 import { startFixture } from '../fixtures/site.js';
 import { makeDecision } from '../fixtures/provider.js';
-import type { Candidate, Interpretation } from '../../src/core/types.js';
+import type { Candidate } from '../../src/core/types.js';
 import { setTimeout as delay } from 'node:timers/promises';
 
 function textPayload(response: { content?: unknown }) {
@@ -47,7 +47,7 @@ test('ordinary host tool calls drive three isolated participants, return images 
     assert.equal(context.options.timeoutMs, 30000);
     const firstPacket = textPayload(response);
     const participantIds = new Set<string>();
-    let decisions = 0; let findingsSubmitted = 0; let replayTested = false;
+    let decisions = 0; let replayTested = false;
     for (let guard = 0; guard < 20; guard++) {
       const packet = textPayload(response);
       if (packet.phase === 'finished') break;
@@ -78,19 +78,16 @@ test('ordinary host tool calls drive three isolated participants, return images 
           replayTested = true;
         }
       } else {
-        assert.equal(packet.phase, 'awaiting_findings');
-        const findings: Interpretation[] = [{ title: 'Pricing label unclear', category: 'navigation', stepNumbers: [1],
-          likelyUsabilityProblem: 'Options may not communicate pricing', recommendation: 'Use a clear destination label', taskImpact: 'minor-delay', confidence: 'medium' }];
-        response = await client.callTool({ name: 'usability_submit_findings', arguments: { runId: packet.runId, requestId: packet.requestId, findings } });
-        findingsSubmitted++;
+        assert.fail('Round interpretations must be deferred until all journeys finish');
       }
     }
     const final = textPayload(response);
     assert.equal(final.phase, 'finished', JSON.stringify(final));
     assert.equal(final.runId, firstPacket.runId);
-    assert.equal(final.status, 'finished'); assert.equal(decisions, 9); assert.equal(findingsSubmitted, 3);
+    assert.equal(final.status, 'finished'); assert.equal(decisions, 9);
     assert.equal(participantIds.size, 3);
-    assert.equal(final.topFindings[0].evidence.length, 3);
+    assert.equal(final.topFindings.length, 0);
+    assert.equal(final.nextTool, 'usability_get_review');
     assert(final.taskOutcomes.every((s: { status: string }) => s.status === 'completed'));
     const reportResource = await client.readResource({ uri: `usability://rounds/${final.runId}/report` });
     const report = JSON.parse((reportResource.contents[0] as { text: string }).text);

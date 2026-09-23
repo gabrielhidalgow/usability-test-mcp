@@ -34,6 +34,22 @@ The host calls `usability_quick_test`, observes screenshots, chooses each action
 
 `device: "mobile"` means a phone-sized Chromium browser, not native iOS/Android or actual Mobile Safari. Desktop and mobile web share the same browser policy and evidence/report pipeline.
 
+## Compare three synthetic participants
+
+Ask: **“Test [URL] with three different synthetic participants trying to [goal]. Compare recurring problems and successful paths, then finish the UX and content reviews.”** This uses `usability_quick_test` with `participantCount: 3`. One participant remains the default.
+
+Each participant starts at the same URL with the same task and device. Default profiles vary prior knowledge, technical confidence, and information needs; they are explicitly assumptions. For research-informed profiles, use guided project setup, identify supporting owner research, and review the proposed profiles. Existing approved profiles remain usable; older profiles show an unspecified basis.
+
+Browsers and supplied histories are isolated. Hosts should hand only the participant packet to a fresh model context where supported and report `contextIsolation` on the first decision: `shared`, `host-reported fresh`, or `unknown`. The MCP cannot create or verify fresh host contexts, remove prior chat knowledge, or guarantee independent reasoning. Missing declarations remain unknown. Do not force mistakes, emotional responses or different routes to make profiles appear distinct.
+
+Rounds now finish **all journeys before interpretation**. The host then follows `usability_get_review` / `usability_submit_review` through four saved stages: participant findings, pattern synthesis, UX review, and content review. A browser run marked finished may still have pending reviews. Each submission uses the current revision; exact retries are safe and stale changes are rejected. Reviews resume after a server restart without browser actions. To inspect screenshots, call `usability_get_review` with the round ID, session ID and step number.
+
+Patterns group related evidence by the visible interface and obstacle, not identical titles. Each includes assessments for every stable participant ID: experienced, successful, not-observed, or inconclusive. Successful/experienced assessments require recorded evidence. Duplicate names do not collapse participants; continuation segments count once. Uncertain groups can be omitted so individual findings stay ungrouped. Invalid submissions leave the last saved report intact.
+
+The report preserves individual findings and shows successful paths, conflicting evidence, incomplete journeys, assumptions and isolation limitations. UX/content recommendations are separate expert interpretations and never increase participant counts. Grouping remains a host judgment; validation checks references, not whether an interpretation is objectively true. “Observed in two simulated journeys” is qualitative evidence, not a population percentage or proof of human behaviour. Shared model bias may recur across profiles.
+
+Comparison mode supports desktop and mobile web. Native rounds remain unsupported.
+
 ## Continue an interrupted web test
 
 Ask: **“Continue session-… from where it stopped.”** `usability_continue_session` reads its saved checkpoint after restart, opens the last observed same-origin URL in a fresh browser and includes only that participant's prior decisions/history. It never replays a click, resubmits a form or copies old findings into participant context. Active runs should use `usability_get_session_state`; cancel them before continuing. Completed runs cannot be continued.
@@ -96,17 +112,21 @@ npm run fixture
 Connect the MCP server to your chat host using the settings below. Ask the chat to test the fixture or your own local/staging site. The chat follows an ordinary tool loop:
 
 ```text
-usability_run_session (or usability_run_round)
+usability_run_session
   -> screenshot + visible state + persona/scenario/goal
   -> chat chooses one action
 usability_advance_session
   -> next screenshot + visible state
   -> repeat until participant finishes
 usability_submit_findings
-  -> report, or next participant in a round
+  -> single-participant report
+
+For rounds: repeat observation/action for every participant, then
+usability_get_review -> usability_submit_review
+  -> participants -> synthesis -> ux -> content -> complete
 ```
 
-The server returns `nextTool` and a one-use `requestId` at each pause. The chat should continue until `phase: "finished"`; starting a run is not completing it. Ordinary MCP tools and image results are used; **MCP sampling support is not required**. The server does not log in to a provider, reuse subscription tokens, scrape chat websites, or call a model endpoint.
+The server returns `nextTool` and a one-use `requestId` at each pause. The chat should continue until `phase: "finished"` and, for rounds, until the saved review stage is `complete`; starting a run is not completing it. Ordinary MCP tools and image results are used; **MCP sampling support is not required**. The server does not log in to a provider, reuse subscription tokens, scrape chat websites, or call a model endpoint.
 
 The host normally starts the stdio server itself. `npm start` waits for MCP messages; it is not a web server. `.env` is optional and contains only local settings, such as `USABILITY_ARTIFACT_DIR` and `USABILITY_HEADLESS`; nothing needs to be configured for model credentials.
 
@@ -178,6 +198,8 @@ For a keyboard journey, ask for `usability_run_accessibility` with the same pers
 | `usability_submit_findings` | Save grounded interpretations after a participant finishes |
 | `usability_get_session_state` | Recover the current request after a lost response without replaying an action |
 | `usability_cancel_session` | Close an abandoned run and retain partial evidence |
+| `usability_get_review` | Read the next saved review stage or inspect evidence screenshots |
+| `usability_submit_review` | Validate and save participant interpretations, patterns, UX or content reviews |
 | `usability_get_report` | Read JSON, Markdown, or journey by session/round ID |
 
 `examples/session.json` is a complete session input. The authoritative Zod schema is `src/config/schema.ts`; MCP `tools/list` publishes its JSON Schema. Unknown fields are rejected.
@@ -186,7 +208,7 @@ Required session fields: `target`, `persona.context`, `scenario`, `goal`. Defaul
 
 Round inputs replace `persona` with optional `personas`, `participantCount` (default 3, maximum 5), and `personaContext`. If you supply personas, their count must equal `participantCount`. Generated personas vary task-relevant technical confidence and constraints; they are templates, not demographic representation. The server resets browser storage and the supplied history per participant, but cannot reset the host's chat memory. Sessions run sequentially; `timeoutMs` includes time waiting for the chat's decisions and findings. Use up to 600000 ms for longer chat journeys.
 
-Follow-up tools require the returned `runId` and `requestId`. A consumed request cannot execute twice. At `awaiting_decision`, submit a `decision` matching the published tool schema (state summary, simulated commentary, selected action, confidence, nullable expectation/friction, behavior). At `awaiting_findings`, submit up to eight evidence-linked `findings`, or `[]`. The next response is either another participant's observation or the completed report. Do not call the start tool repeatedly to advance an existing run.
+Follow-up tools require the returned `runId` and `requestId`. A consumed request cannot execute twice. At `awaiting_decision`, submit a `decision` matching the published tool schema (state summary, simulated commentary, selected action, confidence, nullable expectation/friction, behavior). At `awaiting_findings`, submit up to eight evidence-linked `findings`, or `[]`. Single sessions request findings before their final report. Rounds automatically move to the next participant, deferring interpretation to the saved post-run review workflow. Do not call the start tool repeatedly to advance an existing run.
 
 Abandoned runs time out and save partial reports. Live browser state is held in memory and cannot be restored after a server restart. Saved artifacts remain readable; `usability_continue_session` can start a linked web segment with the saved participant history in a fresh browser. At most four runs are active at once; the last 24 active/completed run states are cached. On connection shutdown the server cancels pending work and closes browsers. Use `usability_cancel_session` before leaving a test unfinished.
 
@@ -223,7 +245,7 @@ Prompts: `run-usability-test` and `retest-after-fixes`. The retest prompt tells 
 
 The directory is ignored by Git. Set `USABILITY_ARTIFACT_DIR` to change its root (absolute paths are best for host-launched servers). Journey snapshots are checkpointed before and after actions; timeouts and failures still generate reports. A screenshot is reused as the next action's before-state so evidence stays continuous. Each state gets an axe scan when enabled.
 
-Reports keep executed actions, action results, simulated commentary, interpretations, recommendations, and evidence references separate. Findings with nonexistent steps or harness safety blocks are discarded. Severity follows task impact. Round clustering conservatively matches category and normalized title and ranks by severity then recurrence; paraphrased findings can remain separate. No statistical significance is claimed.
+Reports keep executed actions, action results, simulated commentary, interpretations, recommendations, and evidence references separate. Findings with nonexistent steps or harness safety blocks are discarded. Severity follows task impact. New round reviews preserve individual findings and group related evidence through validated host submissions. Patterns rank by task-impact severity then the number of distinct participants who experienced the obstacle. Legacy reports retain their original grouping. No statistical significance is claimed.
 
 ## Safety and limitations
 
@@ -242,9 +264,9 @@ The browser guards below apply to web runs. Native runs have the separate experi
 
 `SessionOrchestrator` depends on `ProductDriver` and `ReasoningProvider`. `HostReasoningProvider` pauses the loop for a host decision or interpretation; `HostSessions` connects those pauses to ordinary MCP calls. Playwright handles browser lifecycle, visible UI extraction, targeting, and axe. There is no provider SDK or direct model endpoint. Evidence and reports remain independent of the chosen chat host.
 
-Implemented: host-driven participant loop; screenshots and visible observations returned directly in MCP results; browser isolation; reports; axe and keyboard interaction; rounds and conservative synthesis; MCP tools/resources/prompts; cancellation and duplicate-action protection. Verified with automated fixture and MCP transport tests, not real-human studies or every individual chat product's UI.
+Implemented: host-driven participant loop; screenshots and visible observations returned directly in MCP results; browser isolation; reports; axe and keyboard interaction; rounds with deferred evidence-based comparison and separate UX/content reviews; MCP tools/resources/prompts; cancellation and duplicate-action protection. Verified with automated fixture and MCP transport tests, not real-human studies or every individual chat product's UI.
 
-Deferred: native real-device validation, native rounds/profile support, product-discovery and separate first-impression/exploratory tools, automatic round comparison, additional reasoning providers, trace/video capture, and expanded accessibility interaction analysis. The `ProductDriver` abstraction includes the mobile extension point; native support is experimental and requires the separately prepared Maestro device described above. No dashboards, cloud infrastructure, billing, accounts, or CI/CD are included.
+Deferred: native real-device validation, native rounds/profile support, product-discovery and separate first-impression/exploratory tools, automatic comparison between separate test rounds, additional reasoning providers, trace/video capture, and expanded accessibility interaction analysis. The `ProductDriver` abstraction includes the mobile extension point; native support is experimental and requires the separately prepared Maestro device described above. No dashboards, cloud infrastructure, billing, accounts, or CI/CD are included.
 
 ## Development
 
@@ -266,7 +288,7 @@ In your connected MCP chat, ask:
 
 The host uses `usability_setup_project` to ask five questions. It turns your answers into personas, neutral scenarios and goals, and observable success criteria. It saves the draft with `usability_save_project`, shows you the complete plan, then records your acceptance with `usability_approve_project`. Approval is a host attestation of your chat response, not an independently verified authorization.
 
-`usability_run_project` takes the saved project ID, journey ID, and participant count (default **1**). To try three, the approved plan must contain at least three personas. Continue the normal observation/action/findings tool loop. The same subscription supplies reasoning; there are no model API calls.
+`usability_run_project` takes the saved project ID, journey ID, and participant count (default **1**). To try three, the approved plan must contain at least three personas. For one participant, continue the observation/action/findings loop. For a round, finish all observation/action journeys and then complete the saved review stages. The same subscription supplies reasoning; there are no model API calls.
 
 For another run, ask:
 

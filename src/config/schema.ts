@@ -57,7 +57,7 @@ const envSchema = z.object({
 });
 export function readConfig(env: NodeJS.ProcessEnv = process.env) {
   const parsed = envSchema.safeParse(env);
-  if (!parsed.success) throw new Error('Invalid Usability MCP environment configuration; check .env.example');
+  if (!parsed.success) throw new Error('Invalid Usability Test MCP environment configuration; check .env.example');
   const e = parsed.data;
   return {
     artifactRoot: resolve(e.USABILITY_ARTIFACT_DIR), headless: e.USABILITY_HEADLESS === 'true',

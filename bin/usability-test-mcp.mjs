@@ -43,7 +43,7 @@ export async function registerClaudeCode(entry) {
 export async function main(args) {
   const [command, ...flags] = args;
   if (!command || command === '--help' || command === 'help') {
-    console.log('Usability MCP\n  setup --host codex|claude-code|claude-desktop|manual [--dir ABSOLUTE_PATH]\n  doctor [--native]\n  serve\n\nRequires Node 22+ and npm. Automated setup: macOS; Codex/Claude Code/manual also Linux.\nSetup installs a durable runtime and Chromium. Restart the host afterward.');
+    console.log('Usability Test MCP\n  setup --host codex|claude-code|claude-desktop|manual [--dir ABSOLUTE_PATH]\n  doctor [--native]\n  serve\n\nRequires Node 22+ and npm. Automated setup: macOS; Codex/Claude Code/manual also Linux.\nSetup installs a durable runtime and Chromium. Restart the host afterward.');
     return;
   }
   if (Number(process.versions.node.split('.')[0]) < 22) throw new Error('Node.js 22 or newer is required.');
@@ -84,10 +84,10 @@ export async function main(args) {
     const packed = JSON.parse(run('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', temp], { cwd: packageRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] }));
     await writeFile(join(runtime, 'package.json'), JSON.stringify({ private: true, name: 'usability-local-runtime', version: '1.0.0' }) + '\n');
     run('npm', ['install', '--prefix', runtime, '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund', join(temp, packed[0].filename)]);
-    const installed = join(runtime, 'node_modules', 'usability-mcp');
+    const installed = join(runtime, 'node_modules', 'usability-test-mcp');
     const playwright = join(runtime, 'node_modules', 'playwright', 'cli.js');
     run(process.execPath, [playwright, 'install', 'chromium']);
-    run(process.execPath, [join(installed, 'bin', 'usability-mcp.mjs'), 'doctor']);
+    run(process.execPath, [join(installed, 'bin', 'usability-test-mcp.mjs'), 'doctor']);
     const entry = { command: process.execPath, args: [join(installed, 'dist', 'src', 'index.js')], env: { USABILITY_ARTIFACT_DIR: artifacts } };
     if (host === 'codex') run('codex', ['mcp', 'add', 'usability', '--env', `USABILITY_ARTIFACT_DIR=${artifacts}`, '--', entry.command, ...entry.args]);
     if (host === 'claude-code') await registerClaudeCode(entry);

@@ -13,7 +13,7 @@ export const runMaestro: MaestroRunner = (args, cwd, signal) => new Promise((res
   const timer = setTimeout(kill, 45000);
   signal.addEventListener('abort', kill, { once: true });
   const done = (error?: Error) => { clearTimeout(timer); signal.removeEventListener('abort', kill); error ? reject(error) : resolve(); };
-  child.once('error', () => done(new Error('Native setup: Maestro unavailable. Install Maestro and its Java runtime, then run usability-mcp doctor --native.')));
+  child.once('error', () => done(new Error('Native setup: Maestro unavailable. Install Maestro and its Java runtime, then run usability-test-mcp doctor --native.')));
   child.once('exit', code => code === 0 && !signal.aborted ? done() : done(new Error('Maestro command failed or was cancelled. Check the selected test device and installed app; no action was retried.')));
 });
 const devicesInUse = new Set<string>();

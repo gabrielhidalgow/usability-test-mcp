@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { mergeClaudeConfig, main } from '../../bin/usability-mcp.mjs';
+import { mergeClaudeConfig, main } from '../../bin/usability-test-mcp.mjs';
 
 test('Claude registration preserves settings and other servers, backs up, and updates idempotently', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'usability config '));
@@ -32,8 +32,8 @@ test('invalid setup options fail before installation', async () => {
 test('npm-style executable symlink dispatches the CLI', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'usability-bin-'));
   try {
-    const link = join(dir, 'usability-mcp');
-    await symlink(fileURLToPath(new URL('../../bin/usability-mcp.mjs', import.meta.url)), link);
+    const link = join(dir, 'usability-test-mcp');
+    await symlink(fileURLToPath(new URL('../../bin/usability-test-mcp.mjs', import.meta.url)), link);
     const result = spawnSync(process.execPath, [link, '--help'], { encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /setup --host/);
@@ -41,7 +41,7 @@ test('npm-style executable symlink dispatches the CLI', async () => {
 });
 
 test('Claude Code registration uses user scope, preserves existing settings and can update', async () => {
-  const { claudeCodeArgs, registerClaudeCode } = await import('../../bin/usability-mcp.mjs');
+  const { claudeCodeArgs, registerClaudeCode } = await import('../../bin/usability-test-mcp.mjs');
   const dir = await mkdtemp(join(tmpdir(), 'usability-claude-code-'));
   const previous = process.env.CLAUDE_CONFIG_DIR;
   process.env.CLAUDE_CONFIG_DIR = dir;

@@ -7,7 +7,7 @@ try {
   const config = readConfig();
   const servers = new Set<ReturnType<typeof createServer>>();
   const handle = serveStdio(() => { const server = createServer(config); servers.add(server); return server; }, {
-    onerror: () => console.error('Usability MCP protocol error; request could not be completed.'),
+    onerror: () => console.error('Usability Test MCP protocol error; request could not be completed.'),
   });
   let stopping = false;
   const shutdown = async () => {
@@ -21,6 +21,6 @@ try {
   }
   process.stdin.once('end', () => { void shutdown(); });
 } catch {
-  console.error('Usability MCP startup failed. Check environment configuration against .env.example.');
+  console.error('Usability Test MCP startup failed. Check environment configuration against .env.example.');
   process.exitCode = 1;
 }

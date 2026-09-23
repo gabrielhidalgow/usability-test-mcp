@@ -1,4 +1,4 @@
-# Usability MCP
+# Usability Test MCP
 
 A local-first MCP server for **synthetic usability testing** of websites and mobile web. Participants choose one action at a time from the current screenshot and visible UI semantics. The server stores journeys, screenshots, axe results, and evidence-linked JSON/Markdown reports.
 
@@ -13,13 +13,13 @@ Requires **Node.js 22+**, npm, Git, and the chosen host CLI. The GitHub reposito
 **Codex:**
 
 ```bash
-npx --yes github:gabrielhidalgow/usability-mcp setup --host codex
+npx --yes github:gabrielhidalgow/usability-test-mcp setup --host codex
 ```
 
 **Claude Code:**
 
 ```bash
-npx --yes github:gabrielhidalgow/usability-mcp setup --host claude-code
+npx --yes github:gabrielhidalgow/usability-test-mcp setup --host claude-code
 ```
 
 **Claude Desktop on macOS:** use `--host claude-desktop`. The old `--host claude` alias still means Desktop, not Claude Code.
@@ -65,7 +65,7 @@ The same MCP includes `usability_run_native`, an experimental screenshot-driven 
 Check the setup with:
 
 ```bash
-npx --yes github:gabrielhidalgow/usability-mcp doctor --native
+npx --yes github:gabrielhidalgow/usability-test-mcp doctor --native
 ```
 
 Then ask your host to test an app by providing its app/bundle ID, device ID, operating system, audience and goal, and confirming that the device is prepared for testing. The tool requires `preparedTestDevice: true`.
@@ -77,6 +77,8 @@ The host receives a screenshot, chooses `tap_point` using normalized coordinates
 See [Maestro commands](https://docs.maestro.dev/maestro-cli/maestro-cli-commands-and-options) and [Claude Code MCP configuration](https://code.claude.com/docs/en/mcp) for the underlying local integrations.
 
 ## Installation details
+
+The host registration key (`usability`), tool names, and existing storage directory stay unchanged so upgrades retain reports and profiles. The product, package, executable and GitHub repository are now named **Usability Test MCP** / `usability-test-mcp`.
 
 Default runtime: `~/.local/share/usability-mcp/runtime/`. Reports and profiles: `~/.local/share/usability-mcp/artifacts/`. Use `--dir "/absolute/path"` to change it. Stop active tests before updating; rerun setup to update while retaining artifacts. Host registration uses absolute Node/server paths; rerun setup if you move Node.
 
@@ -134,13 +136,13 @@ Screenshots and UI text are returned to your connected chat and handled under th
 
 ## Connect to Codex
 
-Run `npm run build`. Add the following entry to your project-scoped `.codex/config.toml` (trusted project) or merge it into `~/.codex/config.toml`. Replace `/ABSOLUTE/PATH/usability-mcp` in every location with this repository's absolute path; paths containing spaces work inside the quoted strings.
+Run `npm run build`. Add the following entry to your project-scoped `.codex/config.toml` (trusted project) or merge it into `~/.codex/config.toml`. Replace `/ABSOLUTE/PATH/usability-test-mcp` in every location with this repository's absolute path; paths containing spaces work inside the quoted strings.
 
 ```toml
 [mcp_servers.usability]
 command = "node"
-args = ["/ABSOLUTE/PATH/usability-mcp/dist/src/index.js"]
-cwd = "/ABSOLUTE/PATH/usability-mcp"
+args = ["/ABSOLUTE/PATH/usability-test-mcp/dist/src/index.js"]
+cwd = "/ABSOLUTE/PATH/usability-test-mcp"
 startup_timeout_sec = 20
 tool_timeout_sec = 60
 enabled = true
@@ -151,7 +153,7 @@ If the desktop app cannot find Node, replace `node` with the output of `command 
 Alternatively register through the CLI, then set `cwd` and `tool_timeout_sec` in the resulting entry:
 
 ```bash
-codex mcp add usability -- node /ABSOLUTE/PATH/usability-mcp/dist/src/index.js
+codex mcp add usability -- node /ABSOLUTE/PATH/usability-test-mcp/dist/src/index.js
 codex mcp list
 ```
 
@@ -166,8 +168,8 @@ For Claude Desktop's developer configuration, merge this into its existing `clau
   "mcpServers": {
     "usability": {
       "command": "node",
-      "args": ["/ABSOLUTE/PATH/usability-mcp/dist/src/index.js"],
-      "env": { "USABILITY_ARTIFACT_DIR": "/ABSOLUTE/PATH/usability-mcp/.usability" }
+      "args": ["/ABSOLUTE/PATH/usability-test-mcp/dist/src/index.js"],
+      "env": { "USABILITY_ARTIFACT_DIR": "/ABSOLUTE/PATH/usability-test-mcp/.usability" }
     }
   }
 }

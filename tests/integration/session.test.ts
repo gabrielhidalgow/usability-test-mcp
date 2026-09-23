@@ -1,3 +1,5 @@
+import { createServer } from 'node:http';
+import { setTimeout as delay } from 'node:timers/promises';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
@@ -79,4 +81,30 @@ test('redirects cannot escape the permitted origin, while same-origin redirects 
     const permitted = await runner.run({ ...fixtureInput(fixture.url + '/redirect'), accessibilityChecks: false }, new FixtureProvider());
     assert.equal(permitted.session.status, 'completed', permitted.session.reason);
   } finally { await fixture.close(); await other.close(); await rm(root, { recursive: true, force: true }); }
+});
+
+
+test('slow document navigation is observed without replaying the click', async () => {
+  let destinationReads = 0;
+  const site = createServer(async (request, response) => {
+    if (request.url === '/article') { destinationReads++; await delay(6000); }
+    response.setHeader('Content-Type', 'text/html');
+    response.end(request.url === '/article' ? '<h1>Explanation available</h1>' : '<a href="/article">Read explanation</a>');
+  });
+  await new Promise<void>(resolve => site.listen(0, '127.0.0.1', resolve));
+  const address = site.address();
+  assert(address && typeof address !== 'string');
+  const root = await mkdtemp(join(tmpdir(), 'usability-slow-navigation-'));
+  try {
+    const provider = new FixtureProvider();
+    provider.decideNextAction = async ({ observation }) => observation.visibleText.includes('Explanation available')
+      ? makeDecision({ type: 'finish', outcome: 'completed', reason: 'Explanation reached', visibleEvidence: 'Explanation available' })
+      : makeDecision({ type: 'click', target: observation.candidates.find(c => c.name === 'Read explanation')!.ref, capability: null });
+    provider.evaluateObservation = async () => [];
+    const run = await new SessionOrchestrator(new EvidenceRecorder(root), () => new PlaywrightProductDriver())
+      .run({ ...fixtureInput(`http://127.0.0.1:${address.port}`), accessibilityChecks: false }, provider);
+    assert.equal(run.session.status, 'completed', run.session.reason);
+    assert.equal(run.session.journey[0]?.result.ok, true);
+    assert.equal(destinationReads, 1);
+  } finally { await new Promise<void>(resolve => site.close(() => resolve())); await rm(root, { recursive: true, force: true }); }
 });

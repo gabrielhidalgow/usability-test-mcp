@@ -117,6 +117,17 @@ export class PlaywrightProductDriver implements ProductDriver {
       focused: focused ? redact(focused).slice(0, 1000) : null };
   }
   async getObservation(): Promise<ProductObservation> {
+    // A timed-out action can still have a navigation in flight. Retry observation,
+    // never the action, when the old document is replaced during collection.
+    for (let attempt = 0; ; attempt++) {
+      try { return await this.readObservation(); }
+      catch (error) {
+        if (attempt >= 2 || !(error instanceof Error) || !/Execution context was destroyed|Cannot find context/.test(error.message)) throw error;
+        await this.currentPage().waitForLoadState('domcontentloaded', { timeout: 15000 });
+      }
+    }
+  }
+  private async readObservation(): Promise<ProductObservation> {
     const page = this.currentPage();
     for (const { element } of this.targets.values()) await element.dispose().catch(() => {});
     this.targets.clear();
@@ -186,7 +197,7 @@ export class PlaywrightProductDriver implements ProductDriver {
     if (!bounds || bounds.x >= viewport.width || bounds.y >= viewport.height || bounds.x + bounds.width <= 0 || bounds.y + bounds.height <= 0) throw new Error('Target left viewport');
     return entry.element;
   }
-  async click(target: InteractionTarget): Promise<ActionResult> { return this.perform(async () => (await this.target(target)).click({ timeout: 5000 })); }
+  async click(target: InteractionTarget): Promise<ActionResult> { return this.perform(async () => (await this.target(target)).click({ timeout: 15000 })); }
   async tap(target: InteractionTarget): Promise<ActionResult> { return this.click(target); }
   async type(target: InteractionTarget, value: string): Promise<ActionResult> {
     return this.perform(async () => {

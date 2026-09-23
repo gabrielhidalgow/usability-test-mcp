@@ -106,7 +106,7 @@ test('real stdio starts and cancels a browser session with no provider credentia
   const fixture = await startFixture(); const root = await mkdtemp(join(tmpdir(), 'usability-stdio-host-'));
   const transport = new StdioClientTransport({ command: process.execPath,
     args: ['--import', 'tsx', 'src/index.ts'], cwd: process.cwd(), stderr: 'pipe',
-    env: { ...process.env as Record<string, string>, OPENAI_API_KEY: '', OPENAI_MODEL: '', USABILITY_ARTIFACT_DIR: root } });
+    env: { ...process.env as Record<string, string>, OPENAI_API_KEY: '', OPENAI_MODEL: '', USABILITY_HEADLESS: 'true', USABILITY_ARTIFACT_DIR: root } });
   const client = new Client({ name: 'stdio-subscription-test', version: '1.0.0' });
   try {
     await client.connect(transport);

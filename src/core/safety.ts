@@ -17,6 +17,14 @@ export function labelCapabilities(label: string): Capability[] {
 export function permits(input: SessionInput, capability: Capability): boolean {
   return input.testEnvironment && input.allowedCapabilities.includes(capability);
 }
+// Only a same-origin document link can receive this driver-verified exemption.
+export function isContactPath(url: URL): boolean {
+  return !url.search && !/\b(send|email|message|invite|subscribe|submit|save|confirm|apply|delete|pay|purchase)\b/i.test(url.pathname.replace(/[-_/]/g, ' ')) && /\/(?:contact(?:-us)?|enquir(?:y|ies)|request-(?:a-)?specification)\/?$/i.test(url.pathname);
+}
+export function isContactNavigation(action: Action, observation: ProductObservation): boolean {
+  const ref = action.type === 'click' || action.type === 'tap' ? action.target : action.type === 'key' && action.key === 'Enter' ? observation.semantics.focusedRef : undefined;
+  return Boolean(ref && observation.candidates.find(c => c.ref === ref)?.contactNavigation);
+}
 export function guardAction(action: Action, observation: ProductObservation, input: SessionInput): string | null {
   if (action.type === 'finish' || action.type === 'back' || action.type === 'scroll') return null;
   if (input.interactionMode === 'keyboard' && (action.type === 'click' || action.type === 'tap')) {
@@ -44,7 +52,9 @@ export function guardAction(action: Action, observation: ProductObservation, inp
     label = observation.semantics.focused;
   }
   const required = new Set<Capability>(labelCapabilities(label));
+  const navigation = isContactNavigation(action, observation);
   if ('capability' in action && action.capability) required.add(action.capability);
+  if (navigation) required.delete('communication');
   for (const cap of required) {
     if (!permits(input, cap)) return `Blocked ${cap}: requires testEnvironment and explicit ${cap} opt-in.`;
   }

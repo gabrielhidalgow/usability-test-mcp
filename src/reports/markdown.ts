@@ -63,6 +63,10 @@ export function renderDetailedMarkdown(report: UsabilityReport, directory: strin
       if (review.status === 'complete' && !review.notes.length) lines.push('No additional recommendations submitted.', '');
     }
   }
+  for (const s of report.sessions) {
+    if (s.presentation) lines.push('', `Browser presentation: ${s.presentation}.`);
+    if (s.handoff) lines.push('', `Setup discovery: ${s.handoff.discoveryId}. Context handoff: ${s.handoff.context} (host-reported, not independently verified). Discovery screens and suggested routes were excluded from participant packets.${s.handoff.startingStateConfirmed ? ' Native starting state confirmed by host; no automatic data reset or isolation.' : ''}`);
+  }
   lines.push('', '## Most important findings', '');
   if (!report.findings.length) lines.push(report.comparison?.nextStage === 'participants' ? 'Participant interpretation is pending.' : 'No evidence-linked usability issues were reported. This is not evidence that the product has no issues.');
   for (const issue of report.findings) {

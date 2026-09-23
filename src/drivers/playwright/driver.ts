@@ -3,9 +3,10 @@ import { join } from 'node:path';
 import { chromium, devices, type Browser, type BrowserContext, type ElementHandle, type Page } from 'playwright';
 import { AxeBuilder } from '@axe-core/playwright';
 import type { Capability } from '../../config/schema.js';
-import { labelCapabilities, permits, redact, safeLocation } from '../../core/safety.js';
+import { isContactPath, labelCapabilities, permits, redact, safeLocation } from '../../core/safety.js';
 import type { AccessibilityScan, ActionResult, Candidate, EvidenceArtifact, InteractionTarget, PolicyDiagnostic, ProductObservation } from '../../core/types.js';
-import type { DriverStartConfig, ProductDriver } from '../product-driver.js';
+import { installObserver, showStatus, OBSERVER_SELECTOR } from './observer.js';
+import type { ViewStatus, DriverStartConfig, ProductDriver } from '../product-driver.js';
 
 type TargetEntry = { element: ElementHandle<Node>; candidate: Candidate };
 export class PlaywrightProductDriver implements ProductDriver {
@@ -22,6 +23,8 @@ export class PlaywrightProductDriver implements ProductDriver {
   private policyDiagnostics: PolicyDiagnostic[] = [];
   takePolicyDiagnostics(): PolicyDiagnostic[] { return this.policyDiagnostics.splice(0); }
   private dialogs: string[] = [];
+  private stopping = false;
+  private visible = false;
   private abortListener?: () => void;
   constructor(private readonly headless = true) {}
 
@@ -31,7 +34,10 @@ export class PlaywrightProductDriver implements ProductDriver {
     this.abortListener = () => { void this.stop(); };
     config.signal.addEventListener('abort', this.abortListener, { once: true });
     try {
-      this.browser = await chromium.launch({ headless: this.headless, timeout: 15000 });
+      this.visible = (config.input.presentation ?? (this.headless ? 'background' : 'visible')) === 'visible';
+      if (this.visible && process.platform === 'linux' && !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) throw new Error('Browser display unavailable. Choose presentation=background explicitly, or run on a desktop with a display.');
+      this.browser = await chromium.launch({ headless: !this.visible, timeout: 15000 });
+      this.browser.on('disconnected', () => { if (!this.stopping && !config.signal.aborted) config.onWindowClosed?.(); });
       config.signal.throwIfAborted();
       this.context = await this.browser.newContext({
         ...(config.input.viewport === 'mobile' ? devices['iPhone 13'] : { viewport: { width: 1280, height: 800 } }),
@@ -40,13 +46,13 @@ export class PlaywrightProductDriver implements ProductDriver {
       // Do not let WebSockets bypass HTTP mutation guards.
       await this.context.routeWebSocket('**/*', socket => socket.close());
       const origin = new URL(config.input.target).origin;
-      const blockedUrl = (url: URL, navigation: boolean): PolicyDiagnostic['reason'] | null => {
+      const blockedUrl = (url: URL, navigation: boolean, readDocument = false): PolicyDiagnostic['reason'] | null => {
         let path = url.pathname;
         try { path = decodeURIComponent(path); } catch { /* Treat malformed escapes literally. */ }
         if (!['http:', 'https:'].includes(url.protocol)) return 'unsupported-protocol';
         if (url.username || url.password) return 'credentialed-url';
         if (navigation && url.origin !== origin) return 'cross-origin-navigation';
-        if (labelCapabilities(path.replace(/[-_/]/g, ' ')).some(c => !permits(config.input, c))) return 'capability-denied';
+        if (labelCapabilities(path.replace(/[-_/]/g, ' ')).some(c => !(c === 'communication' && readDocument && url.origin === origin && isContactPath(url)) && !permits(config.input, c))) return 'capability-denied';
         return null;
       };
       await this.context.route('**/*', async route => {
@@ -61,7 +67,7 @@ export class PlaywrightProductDriver implements ProductDriver {
           this.policyDiagnostics.push({ reason, phase, method: request.method(), resourceType: request.resourceType(), mainFrameNavigation, stopsJourney });
           if (stopsJourney) this.denied.push(`Session safety policy blocked ${reason} (${phase}).`);
         };
-        const reason = blockedUrl(url, request.isNavigationRequest()) ?? (mutation &&
+        const reason = blockedUrl(url, request.isNavigationRequest(), mainFrameNavigation && ['GET', 'HEAD'].includes(request.method())) ?? (mutation &&
           (url.origin !== origin || !this.activeCapability || !permits(config.input, this.activeCapability)) ? 'mutation-denied' : null);
         if (reason) {
           deny(reason, 'request');
@@ -72,8 +78,8 @@ export class PlaywrightProductDriver implements ProductDriver {
           try {
             const response = await route.fetch({ maxRedirects: 0, timeout: 15000 });
             const location = response.headers()['location'];
-            if (location && response.status() >= 300 && response.status() < 400 && blockedUrl(new URL(location, url), true)) {
-              deny(blockedUrl(new URL(location, url), true)!, 'redirect');
+            if (location && response.status() >= 300 && response.status() < 400 && blockedUrl(new URL(location, url), true, mainFrameNavigation && ['GET', 'HEAD'].includes(request.method()))) {
+              deny(blockedUrl(new URL(location, url), true, mainFrameNavigation && ['GET', 'HEAD'].includes(request.method()))!, 'redirect');
               await route.abort('blockedbyclient');
             } else await route.fulfill({ response });
             await response.dispose();
@@ -81,6 +87,8 @@ export class PlaywrightProductDriver implements ProductDriver {
         } else await route.continue();
       });
       this.page = await this.context.newPage();
+      this.page.on('close', () => { if (!this.stopping && !config.signal.aborted) config.onWindowClosed?.(); });
+      if (this.visible) await installObserver(this.page);
       this.page.on('popup', popup => { void popup.close(); });
       this.page.on('dialog', dialog => {
         this.dialogs.push(redact(dialog.message()));
@@ -91,13 +99,15 @@ export class PlaywrightProductDriver implements ProductDriver {
       this.page.setDefaultNavigationTimeout(15000);
       await this.page.goto(config.input.target, { waitUntil: 'domcontentloaded' });
       config.signal.throwIfAborted();
-    } catch {
+    } catch (error) {
       await this.stop();
       config.signal.throwIfAborted();
+      if (error instanceof Error && error.message.startsWith('Browser display')) throw error;
       throw new Error('Browser startup or target navigation failed. Install Chromium with npx playwright install chromium and verify the target URL is reachable.');
     }
   }
   async stop(): Promise<void> {
+    this.stopping = true;
     const browser = this.browser;
     this.browser = undefined;
     await browser?.close().catch(() => {});
@@ -109,12 +119,13 @@ export class PlaywrightProductDriver implements ProductDriver {
     if (!this.page || this.page.isClosed()) throw new Error('Browser is not available');
     return this.page;
   }
+  async setViewStatus(status: ViewStatus) { if (this.visible && this.page) await showStatus(this.page, status); }
   setActionCapability(capability: Capability | null): void { this.activeCapability = capability; }
   async getCurrentLocation(): Promise<string> { return safeLocation(this.currentPage().url()); }
   async screenshot(_label?: string): Promise<EvidenceArtifact> {
     const page = this.currentPage();
     const path = join(this.config!.directory, 'screenshots', `${String(++this.sequence).padStart(4, '0')}.png`);
-    await page.screenshot({ path, fullPage: false, timeout: 5000,
+    await page.screenshot({ path, fullPage: false, timeout: 5000, style: `${OBSERVER_SELECTOR}{visibility:hidden!important}`,
       mask: [page.locator('input[type="password"], input[autocomplete="cc-number"], input[autocomplete="cc-csc"]')] });
     await chmod(path, 0o600);
     return { path, mimeType: 'image/png' };
@@ -127,7 +138,9 @@ export class PlaywrightProductDriver implements ProductDriver {
       const labels = 'labels' in e ? Array.from((e as HTMLInputElement).labels ?? []).map(l => l.innerText).join(' ') : '';
       return `${e.getAttribute('role') || e.tagName.toLowerCase()}: ${e.getAttribute('aria-label') || labels || e.innerText || e.getAttribute('placeholder') || '(unlabeled)'}`;
     });
-    return { tree: [...this.targets.values()].map(t => `${t.candidate.ref}: ${t.candidate.role} "${t.candidate.name}"${t.candidate.disabled ? ' [disabled]' : ''}`).join('\n'),
+    let focusedRef: string | undefined;
+    for (const [ref, entry] of this.targets) if (await entry.element.evaluate(e => document.activeElement === e).catch(() => false)) { focusedRef = ref; break; }
+    return { focusedRef, tree: [...this.targets.values()].map(t => `${t.candidate.ref}: ${t.candidate.role} "${t.candidate.name}"${t.candidate.disabled ? ' [disabled]' : ''}`).join('\n'),
       focused: focused ? redact(focused).slice(0, 1000) : null };
   }
   async getObservation(): Promise<ProductObservation> {
@@ -198,8 +211,11 @@ export class PlaywrightProductDriver implements ProductDriver {
           bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height } };
       }).catch(() => null);
       if (!data || this.targets.size >= 150) { await element.dispose(); continue; }
+      const href = await element.evaluate(e => e instanceof HTMLAnchorElement && !e.hasAttribute('download') && (!e.target || e.target === '_self') ? e.href : null);
+      let contactNavigation = false;
+      if (href) { try { const url = new URL(href); contactNavigation = !/\b(send|email|message|invite|subscribe)\b/i.test(data.name) && url.origin === new URL(this.config!.input.target).origin && !url.username && !url.password && isContactPath(url); } catch {} }
       const ref = `o${epoch}-e${this.targets.size + 1}`;
-      this.targets.set(ref, { element, candidate: { ref, ...data, name: redact(data.name) } });
+      this.targets.set(ref, { element, candidate: { ref, ...data, contactNavigation, name: redact(data.name) } });
     }
     const visibleText = await page.evaluate(() => {
       const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -243,7 +259,31 @@ export class PlaywrightProductDriver implements ProductDriver {
     if (!bounds || bounds.x >= viewport.width || bounds.y >= viewport.height || bounds.x + bounds.width <= 0 || bounds.y + bounds.height <= 0) throw new Error('Target left viewport');
     return entry.element;
   }
-  async click(target: InteractionTarget): Promise<ActionResult> { return this.perform(async () => (await this.target(target)).click({ timeout: 15000 })); }
+  async click(target: InteractionTarget): Promise<ActionResult> {
+    return this.perform(async () => {
+      const element = await this.target(target);
+      // Recheck the link at execution time; never grant communication for navigation.
+      if (this.targets.get(target.ref)?.candidate.contactNavigation) {
+        const href = await element.evaluate(e => e instanceof HTMLAnchorElement && !e.hasAttribute('download') && (!e.target || e.target === '_self') ? e.href : null);
+        if (!href || new URL(href).origin !== new URL(this.config!.input.target).origin || !isContactPath(new URL(href))) throw new Error('Navigation target changed');
+        this.activeCapability = null;
+      }
+      if (this.visible) {
+        const box = await element.boundingBox();
+        const viewport = this.currentPage().viewportSize()!;
+        if (box) {
+          const x = (Math.max(0, box.x) + Math.min(viewport.width, box.x + box.width)) / 2;
+          const y = (Math.max(0, box.y) + Math.min(viewport.height, box.y + box.height)) / 2;
+          await this.currentPage().mouse.move(x, y, { steps: 8 });
+          await new Promise(resolve => setTimeout(resolve, 200));
+          await element.click({ timeout: 15000, position: { x: x - box.x, y: y - box.y } });
+          await new Promise(resolve => setTimeout(resolve, 350));
+          return;
+        }
+      }
+      await element.click({ timeout: 15000 });
+    });
+  }
   async tap(target: InteractionTarget): Promise<ActionResult> { return this.click(target); }
   async type(target: InteractionTarget, value: string): Promise<ActionResult> {
     return this.perform(async () => {
@@ -263,9 +303,29 @@ export class PlaywrightProductDriver implements ProductDriver {
   }
   async pressKey(key: string): Promise<ActionResult> { return this.perform(() => this.currentPage().keyboard.press(key)); }
   async goBack(): Promise<ActionResult> { return this.perform(() => this.currentPage().goBack({ waitUntil: 'domcontentloaded' })); }
+  async visibleDiscoveryLinks(): Promise<{ label: string; url: string }[]> {
+    const links: { label: string; url: string }[] = [];
+    for (const { element, candidate } of this.targets.values()) {
+      const href = await element.evaluate(e => e instanceof HTMLAnchorElement && !e.hasAttribute('download') && (!e.target || e.target === '_self') ? e.href : null);
+      if (!href) continue;
+      const url = new URL(href); const origin = new URL(this.config!.input.target).origin;
+      if (url.origin !== origin || url.username || url.password || url.search || /\.(pdf|zip|docx?|xlsx?)$/i.test(url.pathname)) continue;
+      if (labelCapabilities(candidate.name).some(c => !(c === 'communication' && isContactPath(url)))) continue;
+      links.push({ label: candidate.name, url: url.href });
+    }
+    return links;
+  }
+  async visitDiscoveryLink(url: string): Promise<void> {
+    if (!(await this.visibleDiscoveryLinks()).some(link => link.url === url)) throw new Error('Discovery requires a currently visible link');
+    await this.currentPage().goto(url, { waitUntil: 'domcontentloaded' });
+  }
+  async returnToDiscoveryStart(): Promise<void> {
+    await this.currentPage().goto(this.config!.input.target, { waitUntil: 'domcontentloaded' });
+    await this.getObservation();
+  }
   async scanAccessibility(step: number, screenshot: string): Promise<AccessibilityScan> {
     try {
-      const result = await new AxeBuilder({ page: this.currentPage() }).analyze();
+      const result = await new AxeBuilder({ page: this.currentPage() }).exclude(OBSERVER_SELECTOR).analyze();
       return { step, screenshot, findings: result.violations.map(v => ({ id: v.id, impact: v.impact ?? null,
         description: v.description, helpUrl: v.helpUrl, targets: v.nodes.map(n => n.target.join(' ')) })) };
     } catch {

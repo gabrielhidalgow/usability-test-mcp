@@ -30,9 +30,41 @@ Then just ask:
 
 > Quickly test https://example.com on mobile. The user is a first-time visitor trying to find the right plan and its monthly cost.
 
-The host calls `usability_quick_test`, observes screenshots, chooses each action, and returns the report. Quick mode uses one participant, up to 12 actions, ten minutes, and no axe scan unless requested. It requires a goal; it does not invent one or require a saved profile. Use the guided project questionnaire when you want a reusable plan.
+The host calls `usability_quick_test`, observes screenshots, chooses each action, and returns the report. Quick mode uses one participant, up to 12 actions, ten minutes, and no axe scan unless requested. It requires a goal; it does not invent one or require a saved profile. Use discovery-assisted project setup when you want a reusable plan. Quick tests do not automatically scan; if discovery already exists for the product, a fresh-context handoff is required.
 
 `device: "mobile"` means a phone-sized Chromium browser, not native iOS/Android or actual Mobile Safari. Desktop and mobile web share the same browser policy and evidence/report pipeline.
+
+## Prefilled setup and clean handoff
+
+Ask **“Set up a usability test for [URL].”** `usability_setup_project` scans the visible starting page and up to three same-origin pages linked from it. It reads rendered content, not source code, hidden routes or forms. This is setup discovery, not a participant journey.
+
+The connected chat drafts purpose, audience, possible journeys and success criteria, stores them with `usability_save_setup_suggestions`, and shows:
+
+> I reviewed these screens and drafted the answers below. You can edit, replace, or remove any suggestion.
+
+Each suggestion has source-screen IDs and an observed/assumption label. Source references are checked; the interpretation remains the host model's judgment. Supplied answers and existing approved profiles take precedence. Business priorities and testing boundaries must come from you. If scanning fails or you prefer manual setup, omit `target`/`scan` and answer the questionnaire directly.
+
+After you approve a discovery-assisted plan, use a **fresh host agent or a clean conversation**. The approval response includes a short handoff instruction with only the project/journey IDs and freshness declaration. Do not copy discovery screenshots, suggested routes or evaluator criteria into that context. Start with `usability_run_project` directly; do not reopen discovery in the participant chat. Each participant's first decision must declare `contextIsolation: "host-reported fresh"`.
+
+Run options use `handoff: { discoveryId, context: "host-reported fresh" }`. Shared/unknown contexts are rejected. Once a product has saved discovery evidence, direct quick/session/round calls also require a matching handoff; omitting its ID does not silently bypass the requirement. The server can check declarations and exclude discovery from packets, **but cannot independently verify host memory or create fresh AI contexts**. A coordinator can handle setup while a fresh agent handles decisions using the returned participant packet.
+
+Discovery evidence is stored separately under `discoveries/discovery-…/`. Approved plans retain only its ID; reports record the handoff and presentation mode in their appendix. Participant packets contain their neutral profile/task, current observation and own journey history.
+
+**PDF/download limits:** opening PDFs, downloads, popups and off-origin navigation remain unsupported. Setup must flag those success criteria as untestable or propose a supported alternative, such as locating the data-sheet link. Never report that a PDF was opened when it was not.
+
+For a native app use `scan` (or `usability_discover_product`) with `platform: "native"`, `appId`, `deviceId`, `os`, `preparedTestDevice: true`, and `currentAppConfirmed: true`. The app must already be visible on the prepared test device. Discovery captures that screen only: no launch, navigation or data reset. Native plans allow one participant. Before testing confirm the intended starting screen with `handoff.startingStateConfirmed: true` (or `options.startingStateConfirmed` for a manual native plan without discovery). App identity and starting state are host-confirmed, not independently verified. Native support remains experimental and requires separately installed Maestro and a prepared device.
+
+## Watch a test live
+
+New web runs default to **visible Chromium**, including a phone-sized window for mobile web. A highlighted pointer follows actual mouse movement/clicks; a small badge identifies the participant, step, pending decision and action state. It distinguishes the next planned action from execution. Pauses while the chat decides are normal. The badge never displays typed values.
+
+Watch without clicking or typing into the test window. Closing it cancels the session and preserves partial evidence. Browser contexts are fresh for each sequential participant. The viewer decorations are excluded from participant screenshots, visible text, layout-settling checks and accessibility scans.
+
+For background automation set `presentation: "background"` on a quick test, session, round or project-run options. An explicit `USABILITY_HEADLESS=true` setting remains respected when the per-run option is omitted; setup preserves an existing host preference. A per-run setting takes precedence. Without a desktop display the server explains the problem; it does not silently switch to background mode.
+
+Native runs are watched on the prepared emulator/simulator. Browser pointer decorations do not apply to native apps.
+
+Ordinary same-origin document links to contact/information pages can now open without granting communication permission. Sending messages, submitting forms and consequential actions remain guarded. This narrow navigation exception does not authorize communications or guarantee that arbitrary GET requests have no side effects.
 
 ## Compare three synthetic participants
 
@@ -88,7 +120,7 @@ Then ask your host to test an app by providing its app/bundle ID, device ID, ope
 
 The host receives a screenshot, chooses `tap_point` using normalized coordinates plus the visible control label, or `enter_text` after focusing a non-sensitive field. Scroll and Android back are supported. iOS back uses the visible back control. No source code, hidden hierarchy IDs or predetermined flow is provided to the participant.
 
-**Limits:** this adapter is tested with a labelled command-runner fixture, not a real device on the development machine (Maestro, Java and simulator were unavailable). Treat it as experimental until your device smoke test passes. There is no native network interception, independent verification of tap labels, screenshot masking, app-data isolation/reset, or native accessibility audit. Permissions are denied at launch; permission-dependent features may be unavailable. The adapter does not stop or clear the app at session end. Use fake data and a prepared sandbox app; do not use personal devices or production accounts. Concurrent use of the same device is prevented only within one server process. Native rounds and saved native project profiles are not yet supported.
+**Limits:** this adapter is tested with a labelled command-runner fixture, not a real device on the development machine (Maestro, Java and simulator were unavailable). Treat it as experimental until your device smoke test passes. There is no native network interception, independent verification of tap labels, screenshot masking, app-data isolation/reset, or native accessibility audit. Permissions are denied at launch; permission-dependent features may be unavailable. The adapter does not stop or clear the app at session end. Use fake data and a prepared sandbox app; do not use personal devices or production accounts. Concurrent use of the same device is prevented only within one server process. Native rounds remain unsupported; saved native profiles support one participant and require confirmation of the starting state.
 
 See [Maestro commands](https://docs.maestro.dev/maestro-cli/maestro-cli-commands-and-options) and [Claude Code MCP configuration](https://code.claude.com/docs/en/mcp) for the underlying local integrations.
 
@@ -148,7 +180,7 @@ The server returns `nextTool` and a one-use `requestId` at each pause. The chat 
 
 The host normally starts the stdio server itself. `npm start` waits for MCP messages; it is not a web server. `.env` is optional and contains only local settings, such as `USABILITY_ARTIFACT_DIR` and `USABILITY_HEADLESS`; nothing needs to be configured for model credentials.
 
-Screenshots and UI text are returned to your connected chat and handled under that host's data policies. Only test data you are authorized to share there. The server does not send target source code or response bodies to the host. Browser data is isolated per participant; **chat context is controlled by the host**, so use fresh model contexts where available and avoid running participants in a conversation that already knows the target implementation. If one chat runs all personas, treat them as separate browser journeys, not independently isolated model participants.
+Screenshots and UI text are returned to your connected chat and handled under that host's data policies. Only test data you are authorized to share there. The server does not send target source code or response bodies to the host. Browser data is isolated per participant; **chat context is controlled by the host**. Discovery-assisted runs require host-reported fresh contexts; for other runs use fresh model contexts where available and avoid running participants in a conversation that already knows the target implementation. If one chat runs all personas, treat them as separate browser journeys, not independently isolated model participants.
 
 ## Connect to Codex
 
@@ -205,6 +237,9 @@ For a keyboard journey, ask for `usability_run_accessibility` with the same pers
 
 | Tool | Behavior |
 | --- | --- |
+| `usability_discover_product` | Capture visible setup screens separately from participant journeys |
+| `usability_get_discovery` | Setup coordinator reads captured screens and provenance |
+| `usability_save_setup_suggestions` | Store sourced, editable suggestions without inferring priorities or boundaries |
 | `usability_health` | Local status and API-free host reasoning mode |
 | `usability_quick_test` | Start a desktop or mobile-web journey from a URL, goal, and audience |
 | `usability_continue_session` | Start a linked segment of an interrupted web journey with its saved history and a fresh browser |
@@ -286,7 +321,7 @@ The browser guards below apply to web runs. Native runs have the separate experi
 
 Implemented: host-driven participant loop; screenshots and visible observations returned directly in MCP results; browser isolation; reports; axe and keyboard interaction; rounds with deferred evidence-based comparison and separate UX/content reviews; MCP tools/resources/prompts; cancellation and duplicate-action protection. Verified with automated fixture and MCP transport tests, not real-human studies or every individual chat product's UI.
 
-Deferred: native real-device validation, native rounds/profile support, product-discovery and separate first-impression/exploratory tools, automatic comparison between separate test rounds, additional reasoning providers, trace/video capture, and expanded accessibility interaction analysis. The `ProductDriver` abstraction includes the mobile extension point; native support is experimental and requires the separately prepared Maestro device described above. No dashboards, cloud infrastructure, billing, accounts, or CI/CD are included.
+Deferred: native real-device validation, native rounds, product-discovery and separate first-impression/exploratory tools, automatic comparison between separate test rounds, additional reasoning providers, trace/video capture, and expanded accessibility interaction analysis. The `ProductDriver` abstraction includes the mobile extension point; native support is experimental and requires the separately prepared Maestro device described above. No dashboards, cloud infrastructure, billing, accounts, or CI/CD are included.
 
 ## Development
 

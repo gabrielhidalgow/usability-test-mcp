@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MaestroProductDriver, type MaestroRunner } from '../../src/drivers/maestro/driver.js';
 import { sessionInputSchema } from '../../src/config/schema.js';
+import { Discoveries } from '../../src/projects/discovery.js';
 import { guardAction } from '../../src/core/safety.js';
 import { actionSchema } from '../../src/core/types.js';
 const native = { platform: 'native', target: 'com.example.fixture', native: { deviceId: 'emulator-5554', os: 'android', preparedTestDevice: true }, testEnvironment: true, accessibilityChecks: false, persona: { context: 'Test double only' }, scenario: 'Test', goal: 'Inspect' };
@@ -46,6 +47,16 @@ test('Maestro adapter uses one screenshot-driven command, protects device owners
     await a.tapPoint(0.5, 0.25);
     assert.deepEqual(flows.at(-1), [{tapOn:{point:'50.000%,25.000%',retryTapIfNoChange:false}}]);
     assert.deepEqual(flows[0], [{launchApp:{clearState:false,stopApp:false,permissions:{all:'deny'}}}]);
-    await a.stop(); await b.start(config);
+    await a.stop();
+    const count=flows.length; await b.startDiscovery(config); await b.getObservation();
+    assert.equal(flows.length,count+1);assert.deepEqual(Object.keys(flows.at(-1)![0] as object),['takeScreenshot'],'Discovery must only capture, never launch or navigate');
+    await b.stop();
+    const beforeDiscovery=flows.length;
+    const discoveries=new Discoveries(root,true);
+    const captured=await discoveries.capture({platform:'native',appId:native.target,deviceId:'emulator-5554',os:'android',preparedTestDevice:true,currentAppConfirmed:true},undefined,()=>new MaestroProductDriver(runner));
+    assert.equal(captured.observations.length,1);assert.equal(flows.length,beforeDiscovery+1);
+    await assert.rejects(discoveries.verifyHandoff({...input,handoff:{discoveryId:captured.id,context:'host-reported fresh'}}),/starting state/);
+    await discoveries.verifyHandoff({...input,handoff:{discoveryId:captured.id,context:'host-reported fresh',startingStateConfirmed:true}});
+    await b.start(config);
   } finally { await a.stop(); await b.stop(); await rm(root,{recursive:true,force:true}); }
 });

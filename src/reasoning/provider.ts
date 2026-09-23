@@ -3,6 +3,7 @@ import type { Continuation, PriorHistory, Interpretation, JourneyStep, Participa
 
 export type ParticipantDecisionInput = {
   sessionId: string;
+  presentation?: 'visible' | 'background';
   continuation?: Continuation; priorHistory?: PriorHistory[];
   persona: Persona; scenario: string; goal: string; interactionMode: 'standard' | 'keyboard';
   observation: ProductObservation; history: JourneyStep[]; signal: AbortSignal;

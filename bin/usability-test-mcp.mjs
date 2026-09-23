@@ -21,6 +21,8 @@ export async function mergeClaudeConfig(path, entry) {
   if (!config || Array.isArray(config) || typeof config !== 'object' || (config.mcpServers !== undefined && (!config.mcpServers || Array.isArray(config.mcpServers) || typeof config.mcpServers !== 'object'))) throw new Error('Unexpected Claude configuration; it was not changed.');
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
   if (existing) await copyFile(path, `${path}.${randomUUID()}.bak`);
+  const previousHeadless = config.mcpServers?.usability?.env?.USABILITY_HEADLESS;
+  if (entry.env?.USABILITY_HEADLESS === undefined && ['true','false'].includes(previousHeadless)) entry = { ...entry, env: { ...entry.env, USABILITY_HEADLESS: previousHeadless } };
   config.mcpServers = { ...config.mcpServers, usability: entry };
   const temp = `${path}.${randomUUID()}.tmp`;
   await writeFile(temp, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 });
@@ -88,8 +90,14 @@ export async function main(args) {
     const playwright = join(runtime, 'node_modules', 'playwright', 'cli.js');
     run(process.execPath, [playwright, 'install', 'chromium']);
     run(process.execPath, [join(installed, 'bin', 'usability-test-mcp.mjs'), 'doctor']);
-    const entry = { command: process.execPath, args: [join(installed, 'dist', 'src', 'index.js')], env: { USABILITY_ARTIFACT_DIR: artifacts } };
-    if (host === 'codex') run('codex', ['mcp', 'add', 'usability', '--env', `USABILITY_ARTIFACT_DIR=${artifacts}`, '--', entry.command, ...entry.args]);
+    const entry = { command: process.execPath, args: [join(installed, 'dist', 'src', 'index.js')], env: { USABILITY_ARTIFACT_DIR: artifacts, ...(['true','false'].includes(process.env.USABILITY_HEADLESS) ? { USABILITY_HEADLESS: process.env.USABILITY_HEADLESS } : {}) } };
+    if (host === 'codex') {
+      const previous = spawnSync('codex', ['mcp', 'get', 'usability', '--json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      if (previous.status === 0 && entry.env.USABILITY_HEADLESS === undefined) {
+        try { const saved = JSON.parse(previous.stdout); const value = saved.transport?.env?.USABILITY_HEADLESS; if (['true','false'].includes(value)) entry.env.USABILITY_HEADLESS = value; } catch { throw new Error('Existing Codex entry could not be read; registration was not changed.'); }
+      }
+      run('codex', ['mcp', 'add', 'usability', ...Object.entries(entry.env).flatMap(([key,value]) => ['--env', `${key}=${value}`]), '--', entry.command, ...entry.args]);
+    }
     if (host === 'claude-code') await registerClaudeCode(entry);
     if (host === 'claude-desktop') await mergeClaudeConfig(join(homedir(), 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json'), entry);
     if (host === 'manual') console.log(JSON.stringify({ mcpServers: { usability: entry } }, null, 2));

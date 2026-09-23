@@ -57,3 +57,16 @@ test('Claude Code registration uses user scope, preserves existing settings and 
     assert.equal(saved.mcpServers.usability.type,'stdio');
   } finally { if(previous===undefined)delete process.env.CLAUDE_CONFIG_DIR;else process.env.CLAUDE_CONFIG_DIR=previous;await rm(dir,{recursive:true,force:true}); }
 });
+
+
+test('updating registration preserves an explicit headless preference', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'usability-headless-'));
+  try {
+    const path=join(dir,'config.json');
+    await writeFile(path,JSON.stringify({mcpServers:{usability:{command:'old',env:{USABILITY_HEADLESS:'true'}}}}));
+    await mergeClaudeConfig(path,{command:'new',env:{USABILITY_ARTIFACT_DIR:'/artifacts'}});
+    assert.equal(JSON.parse(await readFile(path,'utf8')).mcpServers.usability.env.USABILITY_HEADLESS,'true');
+    await mergeClaudeConfig(path,{command:'new',env:{USABILITY_HEADLESS:'false'}});
+    assert.equal(JSON.parse(await readFile(path,'utf8')).mcpServers.usability.env.USABILITY_HEADLESS,'false');
+  } finally { await rm(dir,{recursive:true,force:true}); }
+});

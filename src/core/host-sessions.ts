@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { decisionSchema, interpretationSchema, type Continuation, type PriorHistory, type RunResult, type UsabilityReport, type ArtifactPaths } from './types.js';
+import type { Discoveries } from '../projects/discovery.js';
 import { roundInputSchema, sessionInputSchema } from '../config/schema.js';
 import { HostReasoningProvider, type PendingRequest } from '../reasoning/host.js';
 import { RoundOrchestrator } from './round-orchestrator.js';
@@ -9,6 +10,7 @@ export class HostSessionError extends Error {}
 type Finished = { id: string; status: string; report: UsabilityReport; paths: ArtifactPaths };
 type Job = {
   id?: string; controller: AbortController; pending?: PendingRequest; finished?: Finished;
+  requiresFresh?: boolean;
   failed: boolean; busy: boolean; changed: ReturnType<typeof Promise.withResolvers<void>>; done: Promise<void>;
 };
 export type HostState =
@@ -22,7 +24,7 @@ export type HostState =
 export class HostSessions {
   private readonly jobs = new Map<string, Job>();
   private closed = false;
-  constructor(private readonly sessions: SessionOrchestrator, private readonly rounds: RoundOrchestrator) {}
+  constructor(private readonly sessions: SessionOrchestrator, private readonly rounds: RoundOrchestrator, private readonly discoveries?: Discoveries) {}
 
   private notify(job: Job) { const prior = job.changed; job.changed = Promise.withResolvers<void>(); prior.resolve(); }
   private state(job: Job): HostState {
@@ -51,6 +53,7 @@ export class HostSessions {
   async start(kind: 'session' | 'round', raw: unknown, signal?: AbortSignal, context?: { continuation: Continuation; priorHistory: PriorHistory[] }): Promise<HostState> {
     if (this.closed) throw new HostSessionError('The server is shutting down.');
     const input = kind === 'session' ? sessionInputSchema.parse(raw) : roundInputSchema.parse(raw);
+    try { await this.discoveries?.verifyHandoff(input); } catch (error) { throw new HostSessionError(error instanceof Error ? error.message : 'Fresh-context handoff required'); }
     if ([...this.jobs.values()].filter(j => !j.finished && !j.failed).length >= 4) {
       throw new HostSessionError('Four runs are already active. Finish or cancel one before starting another.');
     }
@@ -58,7 +61,7 @@ export class HostSessions {
       if (this.jobs.size < 24) break;
       if (job.finished || job.failed) this.jobs.delete(key);
     }
-    const job: Job = { controller: new AbortController(), failed: false, busy: false,
+    const job: Job = { requiresFresh: Boolean(input.handoff), controller: new AbortController(), failed: false, busy: false,
       changed: Promise.withResolvers<void>(), done: Promise.resolve() };
     this.jobs.set(randomUUID(), job);
     const provider = () => new HostReasoningProvider(pending => { job.pending = pending; this.notify(job); });
@@ -82,6 +85,7 @@ export class HostSessions {
     if (job.busy || !pending || pending.phase !== 'awaiting_decision' || pending.requestId !== requestId) {
       throw new HostSessionError('Stale or already-consumed decision request. Call usability_get_session_state; never replay an action blindly.');
     }
+    if (job.requiresFresh && !pending.input.history.length && decision.contextIsolation !== 'host-reported fresh') throw new HostSessionError('The first decision of each discovery-assisted participant requires contextIsolation=host-reported fresh from a clean host context.');
     job.busy = true; job.pending = undefined;
     try {
       return await this.requestScope(job, signal, async () => { pending.submit(decision); return this.wait(job); });

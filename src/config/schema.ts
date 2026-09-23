@@ -20,6 +20,8 @@ export const personaSchema = z.strictObject({
   informationNeeds: z.array(z.string().min(1).max(300)).max(10).optional(),
   constraints: z.array(z.string().max(300)).max(10).default([]),
 });
+export const discoveryIdSchema = z.string().regex(/^discovery-[0-9a-f-]{36}$/);
+export const handoffSchema = z.strictObject({ discoveryId: discoveryIdSchema, context: z.enum(['shared', 'host-reported fresh', 'unknown']), startingStateConfirmed: z.boolean().optional() });
 export const sessionBaseSchema = z.strictObject({
   target: z.string().min(1).max(4000),
   platform: z.enum(['web', 'native']).default('web'),
@@ -29,6 +31,8 @@ export const sessionBaseSchema = z.strictObject({
   goal: z.string().min(1).max(2000),
   maxActions: z.number().int().min(1).max(100).default(30),
   timeoutMs: z.number().int().min(1000).max(600000).default(180000),
+  presentation: z.enum(['visible', 'background']).optional(),
+  handoff: handoffSchema.optional(),
   viewport: z.enum(['desktop', 'mobile']).default('desktop'),
   accessibilityChecks: z.boolean().default(true),
   interactionMode: z.enum(['standard', 'keyboard']).default('standard'),
@@ -53,7 +57,7 @@ export const roundInputSchema = sessionBaseSchema.omit({ persona: true }).extend
 
 const envSchema = z.object({
   USABILITY_ARTIFACT_DIR: z.string().min(1).default('.usability'),
-  USABILITY_HEADLESS: z.enum(['true', 'false']).default('true'),
+  USABILITY_HEADLESS: z.enum(['true', 'false']).default('false'),
 });
 export function readConfig(env: NodeJS.ProcessEnv = process.env) {
   const parsed = envSchema.safeParse(env);

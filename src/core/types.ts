@@ -31,9 +31,10 @@ export type InteractionTarget = { ref: string };
 export type EvidenceArtifact = { path: string; mimeType: 'image/png' };
 export type Candidate = {
   ref: string; role: string; name: string; disabled: boolean;
+  contactNavigation?: boolean;
   bounds: { x: number; y: number; width: number; height: number };
 };
-export type AccessibilitySnapshot = { tree: string; focused: string | null };
+export type AccessibilitySnapshot = { tree: string; focused: string | null; focusedRef?: string };
 export type ProductObservation = {
   timestamp: string; location: string; title: string; visibleText: string;
   semantics: AccessibilitySnapshot; candidates: Candidate[];
@@ -90,7 +91,7 @@ export type UsabilityReport = {
   id: string; kind: 'session' | 'round'; synthetic: true; generatedAt: string;
   platform?: 'web' | 'native'; viewport?: 'desktop' | 'mobile'; target: string; scenario: string; goal: string; disclaimer: string;
   sessions: { id: string; persona: Persona; status: SessionStatus; reason: string;
-    continuation?: Continuation; actions: number; wrongTurns: number; backtracks: number; provider: string }[];
+    continuation?: Continuation; presentation?: 'visible' | 'background'; handoff?: SessionInput['handoff']; actions: number; wrongTurns: number; backtracks: number; provider: string }[];
   comparison?: import('./comparison.js').Comparison;
   findings: UsabilityIssue[]; accessibility: (AccessibilityScan & { sessionId: string })[];
   journeys: { sessionId: string; steps: JourneyStep[] }[];

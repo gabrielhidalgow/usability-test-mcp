@@ -39,3 +39,17 @@ test('profiles persist, edits need review, and participant inputs exclude owner 
     await assert.rejects(store.get('../escape'));
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+
+test('approved native profiles require a confirmed starting state and remain single-participant', async () => {
+  const root=await mkdtemp(join(tmpdir(),'native-profile-'));
+  try {
+    const profiles=new ProjectProfiles(root);
+    const draft=await profiles.save({name:'Native fixture',platform:'native',target:'com.example.fixture',native:{deviceId:'emulator-5554',os:'android',preparedTestDevice:true},answers:{purpose:'Fixture',audience:'Visitor',priority:'Read',success:'Visible text',boundaries:'Sandbox only'},personas:[{context:'Visitor'},{context:'Another visitor'}],journeys:[{id:'read',scenario:'First use',goal:'Read the welcome screen',successCriteria:['Welcome text visible']}]});
+    const approved=await profiles.approve(draft.id);
+    assert.throws(()=>projectRun(approved,'read',1),/starting state/);
+    const run=projectRun(approved,'read',1,{startingStateConfirmed:true});
+    assert.equal(run.input.platform,'native');assert.equal(run.input.accessibilityChecks,false);
+    assert.throws(()=>projectRun(approved,'read',2,{startingStateConfirmed:true}),/one participant/);
+  } finally {await rm(root,{recursive:true,force:true});}
+});

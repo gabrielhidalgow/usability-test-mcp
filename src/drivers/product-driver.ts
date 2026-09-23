@@ -2,10 +2,13 @@ import type { SessionInput } from '../config/schema.js';
 import type { AccessibilityScan, AccessibilitySnapshot, ActionResult, EvidenceArtifact,
   InteractionTarget, PolicyDiagnostic, ProductObservation } from '../core/types.js';
 
-export type DriverStartConfig = { input: SessionInput; directory: string; signal: AbortSignal };
+export class BrowserWindowClosed extends Error {}
+export type ViewStatus = { participant: string; step: number; phase: 'waiting' | 'planned' | 'executing' | 'completed' | 'finished'; action?: string };
+export type DriverStartConfig = { onWindowClosed?: () => void; input: SessionInput; directory: string; signal: AbortSignal };
 export interface ProductDriver {
   readonly kind: 'web' | 'mobile';
   readonly limitations?: string[];
+  setViewStatus?(status: ViewStatus): Promise<void>;
   tapPoint?(x: number, y: number): Promise<ActionResult>;
   enterText?(value: string): Promise<ActionResult>;
   takePolicyDiagnostics?(): PolicyDiagnostic[];

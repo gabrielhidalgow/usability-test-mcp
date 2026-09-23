@@ -41,11 +41,15 @@ export class MaestroProductDriver implements ProductDriver {
       await this.runner(['--device', config.input.native!.deviceId, '--platform', config.input.native!.os, 'test', '--test-output-dir', config.directory, path], config.directory, config.signal);
     } finally { await rm(path, { force: true }); }
   }
-  async start(config: DriverStartConfig): Promise<void> {
+  private claim(config: DriverStartConfig): void {
     if (config.input.platform !== 'native' || !config.input.native?.preparedTestDevice || !config.input.testEnvironment) throw new Error('Native tests require a prepared test device.');
     const device = config.input.native.deviceId;
     if (devicesInUse.has(device)) throw new Error('This native device already has an active session.');
     devicesInUse.add(device); this.ownedDevice = device; this.config = config;
+  }
+  async startDiscovery(config: DriverStartConfig): Promise<void> { this.claim(config); }
+  async start(config: DriverStartConfig): Promise<void> {
+    this.claim(config);
     await this.flow([{ launchApp: { clearState: false, stopApp: false, permissions: { all: 'deny' } } }]);
   }
   async stop() { if (this.ownedDevice) devicesInUse.delete(this.ownedDevice); this.ownedDevice = undefined; }

@@ -1,9 +1,9 @@
 import { join } from 'node:path';
 import { sessionInputSchema, type SessionInput } from '../config/schema.js';
 import { decisionSchema, interpretationSchema, type Action, type ActionResult, type Continuation, type PriorHistory, type Interpretation, type JourneyStep, type ProductObservation, type RunResult, type SessionRecord } from './types.js';
-import { guardAction, safeLocation } from './safety.js';
+import { guardAction, isContactNavigation, safeLocation } from './safety.js';
 import { sessionReport } from './synthesis.js';
-import type { ProductDriver } from '../drivers/product-driver.js';
+import { BrowserWindowClosed, type ProductDriver } from '../drivers/product-driver.js';
 import type { ReasoningProvider } from '../reasoning/provider.js';
 import { EvidenceRecorder } from '../evidence/recorder.js';
 
@@ -44,7 +44,8 @@ export class SessionOrchestrator {
     onCreated?.(id);
     const deadline = new AbortController();
     const timer = setTimeout(() => deadline.abort(new Error('Session deadline exceeded')), input.timeoutMs);
-    const signal = externalSignal ? AbortSignal.any([deadline.signal, externalSignal]) : deadline.signal;
+    const windowClosed = new AbortController();
+    const signal = AbortSignal.any([deadline.signal, windowClosed.signal, ...(externalSignal ? [externalSignal] : [])]);
     const driver = this.driverFactory(input);
     const record: SessionRecord = { id, kind: 'session', startedAt: new Date().toISOString(), finishedAt: '',
       continuation: context?.continuation, input: { ...input, target: input.platform === 'web' ? safeLocation(input.target) : input.target }, provider: provider.name, status: 'incomplete',
@@ -77,7 +78,7 @@ export class SessionOrchestrator {
       await this.recorder.json(join(paths.directory, 'accessibility', `${String(step).padStart(4, '0')}.json`), result);
     };
     try {
-      await run(() => driver.start({ input, directory: paths.directory, signal }));
+      await run(() => driver.start({ input, directory: paths.directory, signal, onWindowClosed: () => windowClosed.abort(new BrowserWindowClosed('Browser window closed by viewer')) }));
       stage = 'observation';
       let observation = await run(() => driver.getObservation());
       record.initialObservation = observation;
@@ -88,13 +89,15 @@ export class SessionOrchestrator {
       while (true) {
         collectPolicy();
         stage = 'participant-reasoning';
+        await driver.setViewStatus?.({ participant: input.persona.name, step: record.journey.length + 1, phase: 'waiting' });
         const decision = decisionSchema.parse(await run(() => provider.decideNextAction({
-          sessionId: id, continuation: context?.continuation, priorHistory: context?.priorHistory,
+          sessionId: id, presentation: input.presentation, continuation: context?.continuation, priorHistory: context?.priorHistory,
           persona: input.persona, scenario: input.scenario, goal: input.goal, interactionMode: input.interactionMode,
           observation, history: record.journey, signal,
         })));
         collectPolicy();
         const action = decision.selectedAction;
+        await driver.setViewStatus?.({ participant: input.persona.name, step: record.journey.length + 1, phase: 'planned', action: action.type });
         const step: JourneyStep = { step: record.journey.length + 1, before: observation, decision,
           result: { ok: false, message: 'Action not executed' } };
         record.journey.push(step);
@@ -120,7 +123,9 @@ export class SessionOrchestrator {
         await this.recorder.checkpoint(record);
         record.actions++;
         stage = 'action';
-        step.result = await run(() => execute(driver, action));
+        await driver.setViewStatus?.({ participant: input.persona.name, step: step.step, phase: 'executing', action: action.type });
+        step.result = await run(() => execute(driver, isContactNavigation(action, observation) ? { ...action, capability: null } as Action : action));
+        await driver.setViewStatus?.({ participant: input.persona.name, step: step.step, phase: 'completed', action: action.type });
         stage = 'observation';
         observation = await run(() => driver.getObservation());
         step.after = observation;
@@ -135,11 +140,13 @@ export class SessionOrchestrator {
       }
     } catch (error) {
       if (!(error instanceof PolicyBlocked)) record.failureStage = stage;
-      record.status = error instanceof PolicyBlocked ? 'blocked' : externalSignal?.aborted ? 'cancelled' : deadline.signal.aborted ? 'timeout' : 'error';
-      record.reason = error instanceof PolicyBlocked ? error.message : record.status === 'cancelled' ? 'Session cancelled by caller' : record.status === 'timeout'
+      record.status = error instanceof PolicyBlocked ? 'blocked' : externalSignal?.aborted || windowClosed.signal.aborted ? 'cancelled' : deadline.signal.aborted ? 'timeout' : 'error';
+      record.reason = error instanceof PolicyBlocked ? error.message : record.status === 'cancelled' ? (windowClosed.signal.aborted ? 'Browser window closed by viewer; partial evidence retained' : 'Session cancelled by caller') : record.status === 'timeout'
         ? 'Session deadline exceeded' : `Session could not continue during ${stage}; inspect the saved journey and local setup.`;
-      if (error instanceof Error && (error.message.startsWith('Browser startup') || error.message.startsWith('Native setup:'))) record.reason = error.message;
+      if (error instanceof Error && (error.message.startsWith('Browser startup') || error.message.startsWith('Browser display') || error.message.startsWith('Native setup:'))) record.reason = error.message;
     } finally {
+      await driver.setViewStatus?.({ participant: input.persona.name, step: record.journey.length, phase: 'finished' });
+      if (input.presentation === 'visible' && !signal.aborted) await new Promise(resolve => setTimeout(resolve, 500));
       driver.setActionCapability(null);
       await driver.stop();
       collectPolicy(false);

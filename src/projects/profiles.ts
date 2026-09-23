@@ -2,7 +2,7 @@ import { mkdir, readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { personaSchema, sessionBaseSchema, sessionInputSchema, roundInputSchema, isHttpUrlWithoutCredentials } from '../config/schema.js';
+import { discoveryIdSchema, personaSchema, sessionBaseSchema, sessionInputSchema, roundInputSchema, isHttpUrlWithoutCredentials } from '../config/schema.js';
 import { EvidenceRecorder } from '../evidence/recorder.js';
 
 const answer = z.string().trim().min(1).max(2000);
@@ -17,7 +17,10 @@ export const questions = {
 };
 export const planSchema = z.strictObject({
   name: z.string().trim().min(1).max(120),
-  target: z.url().refine(isHttpUrlWithoutCredentials),
+  target: z.string().min(1).max(4000),
+  platform: z.enum(['web', 'native']).optional(),
+  native: sessionBaseSchema.shape.native,
+  discoveryId: discoveryIdSchema.optional(),
   answers: intakeSchema,
   personas: z.array(personaSchema).min(1).max(5),
   journeys: z.array(z.strictObject({
@@ -25,7 +28,7 @@ export const planSchema = z.strictObject({
     scenario: answer, goal: answer,
     successCriteria: z.array(answer).min(1).max(10),
   })).min(1).max(5),
-}).refine(p => new Set(p.journeys.map(j => j.id)).size === p.journeys.length, 'Journey IDs must be unique');
+}).refine(p => p.platform === 'native' ? /^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+$/.test(p.target) && Boolean(p.native) : isHttpUrlWithoutCredentials(p.target) && !p.native, 'Supply a web URL or a native app ID with prepared-device configuration').refine(p => new Set(p.journeys.map(j => j.id)).size === p.journeys.length, 'Journey IDs must be unique');
 const profileSchema = z.strictObject({ id: projectIdSchema, createdAt: z.string(), approvedAt: z.string().nullable(), plan: planSchema });
 export type ProjectProfile = z.infer<typeof profileSchema>;
 
@@ -57,15 +60,17 @@ export class ProjectProfiles {
     return profile;
   }
 }
-export const projectRunOptionsSchema = sessionBaseSchema.pick({ timeoutMs: true, maxActions: true, accessibilityChecks: true, viewport: true, interactionMode: true }).partial();
+export const projectRunOptionsSchema = sessionBaseSchema.pick({ handoff: true, presentation: true, timeoutMs: true, maxActions: true, accessibilityChecks: true, viewport: true, interactionMode: true }).partial().extend({ startingStateConfirmed: z.boolean().optional() });
 export function projectRun(profile: ProjectProfile, journeyId: string, participantCount: number, options: unknown = {}) {
-  const settings = projectRunOptionsSchema.parse(options);
+  const { startingStateConfirmed, ...settings } = projectRunOptionsSchema.parse(options);
   if (!profile.approvedAt) throw new Error('Review and approve this draft plan before running it.');
   const journey = profile.plan.journeys.find(j => j.id === journeyId);
   if (!journey) throw new Error('Choose a journey ID from the saved plan.');
   if (!Number.isInteger(participantCount) || participantCount < 1 || participantCount > profile.plan.personas.length) throw new Error('The plan needs one persona per requested participant.');
   // Owner priorities, evaluator criteria, and suggested routes never enter participant inputs.
-  const task = { ...settings, target: profile.plan.target, scenario: journey.scenario, goal: journey.goal };
+  if (profile.plan.discoveryId && (settings.handoff?.discoveryId !== profile.plan.discoveryId || settings.handoff.context !== 'host-reported fresh')) throw new Error('Discovery-assisted plans require a fresh-context handoff matching the saved discovery ID.');
+  if (profile.plan.platform === 'native' && (participantCount !== 1 || !(settings.handoff?.startingStateConfirmed || startingStateConfirmed))) throw new Error('Native plans require one participant and confirmation of the starting state in handoff.');
+  const task = { ...settings, ...(profile.plan.platform === 'native' ? { platform: 'native', native: profile.plan.native, testEnvironment: true, accessibilityChecks: false } : {}), target: profile.plan.target, scenario: journey.scenario, goal: journey.goal };
   return participantCount === 1
     ? { kind: 'session' as const, input: sessionInputSchema.parse({ ...task, persona: profile.plan.personas[0] }) }
     : { kind: 'round' as const, input: roundInputSchema.parse({ ...task, participantCount, personas: profile.plan.personas.slice(0, participantCount) }) };

@@ -26,7 +26,7 @@ export function sessionReport(session: SessionRecord, interpretations: Interpret
   return {
     id: session.id, kind: 'session', synthetic: true, generatedAt: new Date().toISOString(),
     platform: session.input.platform, viewport: session.input.platform === 'web' ? session.input.viewport : undefined, target: session.input.target, scenario: session.input.scenario, goal: session.input.goal, disclaimer: DISCLAIMER,
-    sessions: [{ id: session.id, continuation: session.continuation, persona: session.input.persona, status: session.status, reason: session.reason,
+    sessions: [{ id: session.id, continuation: session.continuation, presentation: session.input.presentation, handoff: session.input.handoff, persona: session.input.persona, status: session.status, reason: session.reason,
       actions: session.actions, wrongTurns: session.journey.filter(s => s.decision.behavior === 'wrong-turn').length,
       backtracks: session.journey.filter(s => s.decision.selectedAction.type === 'back').length, provider: session.provider }],
     policyDiagnostics: (session.policyDiagnostics ?? []).map(d => ({ ...d, sessionId: session.id })),

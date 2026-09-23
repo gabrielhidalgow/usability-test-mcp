@@ -1,0 +1,65 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
+import { createServer } from '../../src/mcp/server.js';
+import { startFixture } from '../fixtures/site.js';
+import { makeDecision } from '../fixtures/provider.js';
+import { EvidenceRecorder } from '../../src/evidence/recorder.js';
+import { prepareContinuation } from '../../src/core/continuation.js';
+
+test('quick mobile web run continues after server restart with own history, lineage, and no replay', async () => {
+  const fixture = await startFixture(); const root = await mkdtemp(join(tmpdir(), 'usability-continuation-'));
+  let server = createServer({ artifactRoot:root, headless:true });
+  let client = new Client({name:'continuation-test-double',version:'1'});
+  const connect = async () => { const [a,b]=InMemoryTransport.createLinkedPair(); await server.connect(b); await client.connect(a); };
+  const call = async (name:string,args:Record<string,unknown>) => {
+    const r=await client.callTool({name,arguments:args});
+    assert(!r.isError, JSON.stringify(r.content));
+    return JSON.parse((r.content as {type:string;text:string}[]).find(c=>c.type==='text')!.text);
+  };
+  try {
+    await connect();
+    let state = await call('usability_quick_test',{target:fixture.url,goal:'Find the plan price',device:'mobile'});
+    assert(state.participant.observation.viewport.width < 500);
+    assert.equal(state.participant.observation.capture.settled,true);
+    const firstId = state.runId;
+    const target = state.participant.observation.candidates.find((c:{name:string})=>c.name==='Options');
+    state = await call('usability_advance_session',{runId:firstId,requestId:state.requestId,decision:makeDecision({type:'click',target:target.ref,capability:null})});
+    const active = await client.callTool({name:'usability_continue_session',arguments:{sessionId:firstId}});
+    assert.equal(active.isError,true);
+    const recorder = new EvidenceRecorder(root);
+    const saved = JSON.parse(await recorder.read(firstId, 'journey'));
+    const clone = await recorder.create('session');
+    saved.id = clone.id; saved.status = 'error'; saved.input.testEnvironment = true; saved.input.allowedCapabilities = ['formSubmission'];
+    delete saved.journey.at(-1).after;
+    await recorder.json(clone.paths.journey, saved);
+    const uncertain = await prepareContinuation(recorder, clone.id);
+    assert.equal(uncertain.context.continuation.uncertainAction, true);
+    assert.deepEqual(uncertain.input.allowedCapabilities, []);
+    assert.match(uncertain.context.priorHistory[0]!.steps[0]!.result.message, /Outcome unknown/);
+    saved.journey.at(-1).before.location = 'https://other.example/';
+    await recorder.json(clone.paths.journey, saved);
+    await assert.rejects(prepareContinuation(recorder, clone.id), /same-origin/);
+    await client.close(); await server.close();
+    server=createServer({artifactRoot:root,headless:true}); client=new Client({name:'restarted-test-double',version:'1'}); await connect();
+    state=await call('usability_continue_session',{sessionId:firstId});
+    assert.notEqual(state.runId,firstId);
+    assert.equal(state.participant.continuation.previousSessionId,firstId);
+    assert.equal(state.participant.continuation.browserStateRestored,false);
+    assert.equal(state.participant.priorHistory[0].steps.length,1);
+    assert.equal(state.participant.history.length,0);
+    assert(state.participant.observation.visibleText.includes('$12'));
+    const secondId=state.runId;
+    state=await call('usability_advance_session',{runId:secondId,requestId:state.requestId,decision:makeDecision({type:'finish',outcome:'completed',reason:'Price found',visibleEvidence:'$12 per month'})});
+    state=await call('usability_submit_findings',{runId:secondId,requestId:state.requestId,findings:[]});
+    assert.equal(state.status,'completed');
+    const record=JSON.parse(await readFile(join(root,'sessions',secondId,'session.json'),'utf8'));
+    assert.equal(record.actions,0,'Continuation must not replay previous click');
+    assert.match(await readFile(join(root,'sessions',secondId,'report.md'),'utf8'), /not an independent participant/);
+    await assert.rejects(prepareContinuation(new EvidenceRecorder(root),secondId),/interrupted or incomplete/);
+    assert.equal(fixture.mutations(),0);
+  } finally { await client.close(); await server.close(); await fixture.close(); await rm(root,{recursive:true,force:true}); }
+});

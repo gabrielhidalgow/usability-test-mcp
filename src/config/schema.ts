@@ -19,8 +19,9 @@ export const personaSchema = z.strictObject({
   constraints: z.array(z.string().max(300)).max(10).default([]),
 });
 export const sessionBaseSchema = z.strictObject({
-  target: z.url().refine(isHttpUrlWithoutCredentials, 'Use an HTTP(S) URL without credentials'),
-  platform: z.literal('web').default('web'),
+  target: z.string().min(1).max(4000),
+  platform: z.enum(['web', 'native']).default('web'),
+  native: z.strictObject({ deviceId: z.string().regex(/^[A-Za-z0-9_.:-]{1,160}$/), os: z.enum(['ios', 'android']), preparedTestDevice: z.literal(true) }).optional(),
   persona: personaSchema,
   scenario: z.string().min(1).max(4000),
   goal: z.string().min(1).max(2000),
@@ -32,7 +33,10 @@ export const sessionBaseSchema = z.strictObject({
   testEnvironment: z.boolean().default(false),
   allowedCapabilities: z.array(capabilitySchema).default([]),
 });
-export const sessionInputSchema = sessionBaseSchema.refine(
+export const sessionInputSchema = sessionBaseSchema.refine(x => x.platform === 'web'
+  ? isHttpUrlWithoutCredentials(x.target) && !x.native
+  : /^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+$/.test(x.target) && Boolean(x.native) && x.testEnvironment && x.allowedCapabilities.length === 0 && !x.accessibilityChecks && x.interactionMode === 'standard',
+  'Web requires an HTTP(S) URL without credentials. Native requires an app ID, a prepared test device, testEnvironment=true, no capability overrides, no axe scans and standard interaction.').refine(
   x => x.testEnvironment || x.allowedCapabilities.length === 0,
   'Capability overrides require testEnvironment: true',
 );
@@ -40,7 +44,7 @@ export const roundInputSchema = sessionBaseSchema.omit({ persona: true }).extend
   personas: z.array(personaSchema).min(1).max(5).optional(),
   participantCount: z.number().int().min(1).max(5).default(3),
   personaContext: z.string().min(1).max(2000).default('A first-time visitor pursuing the supplied goal'),
-}).refine(x => x.testEnvironment || x.allowedCapabilities.length === 0,
+}).refine(x => x.platform === 'web' && !x.native && isHttpUrlWithoutCredentials(x.target), 'Rounds currently support web targets only').refine(x => x.testEnvironment || x.allowedCapabilities.length === 0,
   'Capability overrides require testEnvironment: true')
   .refine(x => !x.personas || x.personas.length === x.participantCount,
     'personas length must equal participantCount');

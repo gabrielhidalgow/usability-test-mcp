@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { roundInputSchema, sessionInputSchema, type AppConfig } from '../config/schema.js';
 import { SessionOrchestrator } from '../core/session-orchestrator.js';
 import { RoundOrchestrator } from '../core/round-orchestrator.js';
+import { MaestroProductDriver } from '../drivers/maestro/driver.js';
 import { PlaywrightProductDriver } from '../drivers/playwright/driver.js';
 import { artifactIdSchema, EvidenceRecorder } from '../evidence/recorder.js';
 import { EVALUATOR_INSTRUCTIONS, PARTICIPANT_INSTRUCTIONS, participantPayload } from '../reasoning/host.js';
@@ -11,6 +12,7 @@ import { HostSessionError, HostSessions, type HostState } from '../core/host-ses
 import { decisionSchema, interpretationSchema } from '../core/types.js';
 import { ProjectProfiles, projectIdSchema, intakeSchema, planSchema, questions, projectRun, projectRunOptionsSchema } from '../projects/profiles.js';
 import { join } from 'node:path';
+import { ContinuationError, prepareContinuation } from '../core/continuation.js';
 import { redact } from '../core/safety.js';
 
 function result(value: object, isError = false): CallToolResult {
@@ -35,11 +37,11 @@ export async function hostStateResult(state: HostState): Promise<CallToolResult>
     session: pending.session });
 }
 export function createServer(config: AppConfig) {
-  const server = new McpServer({ name: 'usability-mcp', version: '0.2.0' }, {
-    instructions: 'For a new project, call usability_setup_project, ask the owner its missing questions, draft neutral tasks, save and show the full plan, and approve only after owner review. For an existing project, load its plan and ask what changed or which journey to retest; unchanged approved plans can be reused. Custom boundaries require host oversight; do not run a task that conflicts with them. Use the connected chat model for reasoning; no API key is needed. Start usability_run_session or usability_run_round, inspect the returned screenshot and persona, then call usability_advance_session with ONE decision and the current requestId. Continue until awaiting_findings, submit grounded findings with usability_submit_findings, and repeat until phase=finished. Use a fresh host model context per participant where supported. Never inspect target code or transfer prior findings to participants. Cancel abandoned runs.',
+  const server = new McpServer({ name: 'usability-mcp', version: '0.3.0' }, {
+    instructions: 'For a quick test with a supplied URL and goal, use usability_quick_test (device=mobile for mobile web). For native apps use usability_run_native only on an explicitly prepared test device. Continue interrupted web sessions with usability_continue_session; explain that browser state resets and this is a linked segment, not a new participant. For a reusable project, call usability_setup_project, ask the owner its missing questions, draft neutral tasks, save and show the full plan, and approve only after owner review. For an existing project, load its plan and ask what changed or which journey to retest; unchanged approved plans can be reused. Custom boundaries require host oversight; do not run a task that conflicts with them. Use the connected chat model for reasoning; no API key is needed. Start usability_run_session or usability_run_round, inspect the returned screenshot and persona, then call usability_advance_session with ONE decision and the current requestId. Continue until awaiting_findings, submit grounded findings with usability_submit_findings, and repeat until phase=finished. Use a fresh host model context per participant where supported. Never inspect target code or transfer prior findings to participants. Cancel abandoned runs.',
   });
   const recorder = new EvidenceRecorder(config.artifactRoot);
-  const orchestrator = new SessionOrchestrator(recorder, () => new PlaywrightProductDriver(config.headless));
+  const orchestrator = new SessionOrchestrator(recorder, input => input.platform === 'native' ? new MaestroProductDriver() : new PlaywrightProductDriver(config.headless));
   const rounds = new RoundOrchestrator(recorder, orchestrator);
   const host = new HostSessions(orchestrator, rounds);
   const closeServer = server.close.bind(server);
@@ -94,8 +96,33 @@ export function createServer(config: AppConfig) {
       return await hostStateResult(state);
     } catch { return result({ error: 'Could not start project run. Check approval, journey ID and saved persona count.' }, true); }
   });
+  server.registerTool('usability_continue_session', {
+    description: 'Continue an interrupted WEB session in a linked segment, including after server restart. Restores only the last observed URL and this participant’s history; browser state is reset. Never replays actions. Cannot continue an active/completed session. Explain these limits before use.',
+    inputSchema: z.strictObject({ sessionId: artifactIdSchema, timeoutMs: z.number().int().min(1000).max(600000).default(600000), accessibilityChecks: z.boolean().optional() }),
+  }, async ({ sessionId, timeoutMs, accessibilityChecks }, ctx) => {
+    if (host.isActive(sessionId)) return result({ error: 'This session is still active. Use usability_get_session_state, or cancel it before continuing.' }, true);
+    try {
+      const prepared = await prepareContinuation(recorder, sessionId, { timeoutMs, accessibilityChecks });
+      let project;
+      try { project = JSON.parse(await readFile(join(recorder.paths(sessionId).directory, 'project.json'), 'utf8')); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw new ContinuationError('Saved project context is unreadable. Inspect the prior artifacts before continuing.'); }
+      const state = await host.start('session', prepared.input, ctx.mcpReq.signal, prepared.context);
+      try {
+        if (project) await recorder.json(join(recorder.paths(state.runId).directory, 'project.json'), { ...project, continuationOf: sessionId, continuationOptions: { timeoutMs, accessibilityChecks: prepared.input.accessibilityChecks } });
+      } catch { await host.cancel(state.runId); throw new ContinuationError('Could not save continuation project context; the new segment was cancelled.'); }
+      return await hostStateResult(state);
+    } catch (error) { return result({ error: error instanceof ContinuationError ? error.message : 'Saved session is unavailable or invalid. Inspect its artifacts or start a fresh test.' }, true); }
+  });
+  server.registerTool('usability_quick_test', {
+    description: 'Start a short desktop or mobile WEB test from a URL and user goal, without saving a project. Defaults to one first-time visitor, 12 actions, 10 minutes and no axe scan. Follow nextTool until finished. Ask for a goal if missing; never infer a route from source code.',
+    inputSchema: z.strictObject({ target: z.url().refine(value => { try { const u = new URL(value); return ['http:', 'https:'].includes(u.protocol) && !u.username && !u.password; } catch { return false; } }), goal: z.string().min(1).max(2000), audience: z.string().min(1).max(2000).default('A first-time visitor'), device: z.enum(['desktop', 'mobile']).default('desktop'), accessibilityChecks: z.boolean().default(false) }),
+  }, async ({ target, goal, audience, device, accessibilityChecks }, ctx) => respond(() => host.start('session', { target, goal, scenario: 'You are using this product for the first time to pursue the supplied goal.', persona: { context: audience }, viewport: device, maxActions: 12, timeoutMs: 600000, accessibilityChecks }, ctx.mcpReq.signal)));
+  server.registerTool('usability_run_native', {
+    description: 'EXPERIMENTAL native iOS/Android screenshot-driven test via local Maestro. Requires Maestro/Java, a booted prepared test emulator/simulator and installed app. No network interception, data reset, credential masking or native accessibility audit. Only sandbox apps with fake data. Follow nextTool until finished; use tap_point/enter_text from screenshots. No API keys.',
+    inputSchema: z.strictObject({ appId: z.string().regex(/^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+$/), deviceId: z.string().regex(/^[A-Za-z0-9_.:-]{1,160}$/), os: z.enum(['ios','android']), preparedTestDevice: z.literal(true), goal: z.string().min(1).max(2000), audience: z.string().min(1).max(2000).default('A first-time app user') }),
+  }, async ({ appId, deviceId, os, preparedTestDevice, goal, audience }, ctx) => respond(() => host.start('session', { platform: 'native', target: appId, native: { deviceId, os, preparedTestDevice }, testEnvironment: true, allowedCapabilities: [], goal, persona: { context: audience }, scenario: 'Use the app for the first time to pursue the supplied goal.', maxActions: 12, timeoutMs: 600000, accessibilityChecks: false }, ctx.mcpReq.signal)));
   server.registerTool('usability_health', { description: 'Check local server status. Reasoning is supplied by the connected chat; no model API credentials.', inputSchema: z.strictObject({}) },
-    async () => result({ status: 'ok', platform: 'web', reasoningMode: 'connected-host-chat', apiKeyRequired: false, artifactRoot: config.artifactRoot }));
+    async () => result({ status: 'ok', platforms: ['web', 'mobile-web', 'native-experimental'], reasoningMode: 'connected-host-chat', apiKeyRequired: false, artifactRoot: config.artifactRoot }));
   server.registerTool('usability_run_session', {
     description: 'Start a synthetic participant and return its current UI plus screenshot. The connected chat chooses each action through usability_advance_session; continue until phase=finished. No AI API required.',
     inputSchema: sessionInputSchema,

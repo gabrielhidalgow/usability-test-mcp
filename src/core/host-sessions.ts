@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { decisionSchema, interpretationSchema, type RunResult, type UsabilityReport, type ArtifactPaths } from './types.js';
+import { decisionSchema, interpretationSchema, type Continuation, type PriorHistory, type RunResult, type UsabilityReport, type ArtifactPaths } from './types.js';
 import { roundInputSchema, sessionInputSchema } from '../config/schema.js';
 import { HostReasoningProvider, type PendingRequest } from '../reasoning/host.js';
 import { RoundOrchestrator } from './round-orchestrator.js';
@@ -48,7 +48,7 @@ export class HostSessions {
     try { return signal ? await withAbort(operation, signal) : await operation(); }
     finally { signal?.removeEventListener('abort', abort); }
   }
-  async start(kind: 'session' | 'round', raw: unknown, signal?: AbortSignal): Promise<HostState> {
+  async start(kind: 'session' | 'round', raw: unknown, signal?: AbortSignal, context?: { continuation: Continuation; priorHistory: PriorHistory[] }): Promise<HostState> {
     if (this.closed) throw new HostSessionError('The server is shutting down.');
     const input = kind === 'session' ? sessionInputSchema.parse(raw) : roundInputSchema.parse(raw);
     if ([...this.jobs.values()].filter(j => !j.finished && !j.failed).length >= 4) {
@@ -64,7 +64,7 @@ export class HostSessions {
     const provider = () => new HostReasoningProvider(pending => { job.pending = pending; this.notify(job); });
     const created = (id: string) => { job.id = id; };
     const task = kind === 'session'
-      ? this.sessions.run(input, provider(), job.controller.signal, created).then((run: RunResult) => ({
+      ? this.sessions.run(input, provider(), job.controller.signal, created, context).then((run: RunResult) => ({
         id: run.session.id, status: run.session.status, report: run.report, paths: run.paths,
       }))
       : this.rounds.run(input, provider, job.controller.signal, created);
@@ -72,6 +72,7 @@ export class HostSessions {
       () => { job.pending = undefined; job.failed = true; this.notify(job); });
     return this.requestScope(job, signal, () => this.wait(job));
   }
+  isActive(id: string): boolean { return [...this.jobs.values()].some(j => j.id === id && !j.finished && !j.failed); }
   getState(id: string): HostState { return this.state(this.get(id)); }
 
   async advance(id: string, requestId: string, raw: unknown, signal?: AbortSignal): Promise<HostState> {

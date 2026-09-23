@@ -141,3 +141,28 @@ test('blocked passive resources are diagnosed without ending a readable journey 
     assert.equal(run.report.findings.length, 0);
   } finally { await new Promise<void>(resolve => site.close(() => resolve())); await rm(root, { recursive: true, force: true }); }
 });
+
+test('captures wait for finite entrance motion but bound continuously moving content', async () => {
+  const site = createServer((request,response) => {
+    const infinite = request.url === '/infinite';
+    response.setHeader('Content-Type','text/html');
+    response.end(`<style>@keyframes appear{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:translateY(0)}} h1{animation:appear ${infinite?'0.6s infinite alternate':'0.8s forwards'}}</style><h1>Visible explanation</h1>`);
+  });
+  await new Promise<void>(resolve=>site.listen(0,'127.0.0.1',resolve));
+  const address=site.address();assert(address&&typeof address!=='string');
+  const root=await mkdtemp(join(tmpdir(),'usability-settle-'));
+  try {
+    const provider=new FixtureProvider();
+    provider.decideNextAction=async()=>makeDecision({type:'finish',outcome:'completed',reason:'Heading visible',visibleEvidence:'Visible explanation'});
+    provider.evaluateObservation=async()=>[];
+    const runner=new SessionOrchestrator(new EvidenceRecorder(root),()=>new PlaywrightProductDriver());
+    const finite=await runner.run({...fixtureInput(`http://127.0.0.1:${address.port}`),accessibilityChecks:false},provider);
+    assert.equal(finite.session.initialObservation?.capture?.settled,true);
+    assert(finite.session.initialObservation!.capture!.waitedMs >= 800);
+    assert(finite.session.initialObservation?.visibleText.includes('Visible explanation'));
+    const moving=await runner.run({...fixtureInput(`http://127.0.0.1:${address.port}/infinite`),accessibilityChecks:false},provider);
+    assert.equal(moving.session.initialObservation?.capture?.settled,false);
+    assert(moving.session.initialObservation!.capture!.waitedMs < 4000);
+    assert(moving.report.limitations.some(l=>l.includes('did not settle')));
+  } finally {await new Promise<void>(resolve=>site.close(()=>resolve()));await rm(root,{recursive:true,force:true});}
+});

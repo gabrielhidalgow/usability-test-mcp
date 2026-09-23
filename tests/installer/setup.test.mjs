@@ -39,3 +39,21 @@ test('npm-style executable symlink dispatches the CLI', async () => {
     assert.match(result.stdout, /setup --host/);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test('Claude Code registration uses user scope, preserves existing settings and can update', async () => {
+  const { claudeCodeArgs, registerClaudeCode } = await import('../../bin/usability-mcp.mjs');
+  const dir = await mkdtemp(join(tmpdir(), 'usability-claude-code-'));
+  const previous = process.env.CLAUDE_CONFIG_DIR;
+  process.env.CLAUDE_CONFIG_DIR = dir;
+  try {
+    const entry={command:'/node with spaces',args:['/server with spaces/index.js'],env:{USABILITY_ARTIFACT_DIR:'/reports'}};
+    assert.deepEqual(claudeCodeArgs(entry).slice(0,5),['mcp','add-json','--scope','user','usability']);
+    const path=join(dir,'.claude.json');
+    await writeFile(path,JSON.stringify({theme:'dark',mcpServers:{other:{command:'other'},usability:{command:'old'}}}));
+    await registerClaudeCode(entry);
+    const saved=JSON.parse(await readFile(path,'utf8'));
+    assert.equal(saved.theme,'dark');assert.equal(saved.mcpServers.other.command,'other');
+    assert.equal(saved.mcpServers.usability.command,entry.command);
+    assert.equal(saved.mcpServers.usability.type,'stdio');
+  } finally { if(previous===undefined)delete process.env.CLAUDE_CONFIG_DIR;else process.env.CLAUDE_CONFIG_DIR=previous;await rm(dir,{recursive:true,force:true}); }
+});

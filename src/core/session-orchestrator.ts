@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { sessionInputSchema, type SessionInput } from '../config/schema.js';
-import { decisionSchema, interpretationSchema, type Action, type ActionResult, type Interpretation, type JourneyStep, type ProductObservation, type RunResult, type SessionRecord } from './types.js';
+import { decisionSchema, interpretationSchema, type Action, type ActionResult, type Continuation, type PriorHistory, type Interpretation, type JourneyStep, type ProductObservation, type RunResult, type SessionRecord } from './types.js';
 import { guardAction, safeLocation } from './safety.js';
 import { sessionReport } from './synthesis.js';
 import type { ProductDriver } from '../drivers/product-driver.js';
@@ -21,6 +21,8 @@ export async function withAbort<T>(operation: () => Promise<T>, signal: AbortSig
 async function execute(driver: ProductDriver, action: Action): Promise<ActionResult> {
   driver.setActionCapability('capability' in action ? action.capability : null);
   switch (action.type) {
+    case 'tap_point': if (!driver.tapPoint) throw new Error('Coordinate tapping is unavailable'); return driver.tapPoint(action.x, action.y);
+    case 'enter_text': if (!driver.enterText) throw new Error('Native text input is unavailable'); return driver.enterText(action.value);
     case 'click': return driver.click({ ref: action.target });
     case 'tap': return driver.tap({ ref: action.target });
     case 'type': return driver.type({ ref: action.target }, action.value);
@@ -34,19 +36,20 @@ async function execute(driver: ProductDriver, action: Action): Promise<ActionRes
 class PolicyBlocked extends Error {}
 
 export class SessionOrchestrator {
-  constructor(private readonly recorder: EvidenceRecorder, private readonly driverFactory: () => ProductDriver) {}
+  constructor(private readonly recorder: EvidenceRecorder, private readonly driverFactory: (input: SessionInput) => ProductDriver) {}
 
-  async run(rawInput: unknown, provider: ReasoningProvider, externalSignal?: AbortSignal, onCreated?: (id: string) => void): Promise<RunResult> {
+  async run(rawInput: unknown, provider: ReasoningProvider, externalSignal?: AbortSignal, onCreated?: (id: string) => void, context?: { continuation: Continuation; priorHistory: PriorHistory[] }): Promise<RunResult> {
     const input = sessionInputSchema.parse(rawInput);
     const { id, paths } = await this.recorder.create('session');
     onCreated?.(id);
     const deadline = new AbortController();
     const timer = setTimeout(() => deadline.abort(new Error('Session deadline exceeded')), input.timeoutMs);
     const signal = externalSignal ? AbortSignal.any([deadline.signal, externalSignal]) : deadline.signal;
-    const driver = this.driverFactory();
+    const driver = this.driverFactory(input);
     const record: SessionRecord = { id, kind: 'session', startedAt: new Date().toISOString(), finishedAt: '',
-      input: { ...input, target: safeLocation(input.target) }, provider: provider.name, status: 'incomplete',
-      reason: 'Session has not completed', actions: 0, journey: [], accessibility: [], warnings: [...(provider.limitations ?? [])] };
+      continuation: context?.continuation, input: { ...input, target: input.platform === 'web' ? safeLocation(input.target) : input.target }, provider: provider.name, status: 'incomplete',
+      reason: 'Session has not completed', actions: 0, journey: [], accessibility: [], warnings: [...(provider.limitations ?? []), ...(driver.limitations ?? [])] };
+    if (context) record.warnings.push('Continuation segment: browser cookies, storage, form values, scroll position and navigation history were reset. Prior actions were not replayed; this is not a new independent participant.');
     let interpretations: Interpretation[] = [];
     let stage = 'startup';
     const collectPolicy = (stopOnBlock = true) => {
@@ -78,6 +81,7 @@ export class SessionOrchestrator {
       stage = 'observation';
       let observation = await run(() => driver.getObservation());
       record.initialObservation = observation;
+      if (observation.capture && !observation.capture.settled) record.warnings.push('Initial capture did not settle within its time budget; transient visual findings need rechecking.');
       collectPolicy();
       await this.recorder.checkpoint(record);
       await scan(observation, 0);
@@ -85,7 +89,7 @@ export class SessionOrchestrator {
         collectPolicy();
         stage = 'participant-reasoning';
         const decision = decisionSchema.parse(await run(() => provider.decideNextAction({
-          sessionId: id,
+          sessionId: id, continuation: context?.continuation, priorHistory: context?.priorHistory,
           persona: input.persona, scenario: input.scenario, goal: input.goal, interactionMode: input.interactionMode,
           observation, history: record.journey, signal,
         })));
@@ -120,6 +124,7 @@ export class SessionOrchestrator {
         stage = 'observation';
         observation = await run(() => driver.getObservation());
         step.after = observation;
+        if (observation.capture && !observation.capture.settled) record.warnings.push(`Capture after action ${record.actions} did not settle; transient visual findings need rechecking.`);
         collectPolicy();
         driver.setActionCapability(null);
         await this.recorder.checkpoint(record);
@@ -133,7 +138,7 @@ export class SessionOrchestrator {
       record.status = error instanceof PolicyBlocked ? 'blocked' : externalSignal?.aborted ? 'cancelled' : deadline.signal.aborted ? 'timeout' : 'error';
       record.reason = error instanceof PolicyBlocked ? error.message : record.status === 'cancelled' ? 'Session cancelled by caller' : record.status === 'timeout'
         ? 'Session deadline exceeded' : `Session could not continue during ${stage}; inspect the saved journey and local setup.`;
-      if (error instanceof Error && error.message.startsWith('Browser startup')) record.reason = error.message;
+      if (error instanceof Error && (error.message.startsWith('Browser startup') || error.message.startsWith('Native setup:'))) record.reason = error.message;
     } finally {
       driver.setActionCapability(null);
       await driver.stop();

@@ -26,14 +26,34 @@ export async function mergeClaudeConfig(path, entry) {
   await writeFile(temp, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 });
   await rename(temp, path);
 }
+export function claudeCodeArgs(entry) {
+  return ['mcp', 'add-json', '--scope', 'user', 'usability', JSON.stringify({ type: 'stdio', ...entry })];
+}
+export async function registerClaudeCode(entry) {
+  // Claude's CLI refuses duplicate names. Merge only our user entry when it
+  // already exists, preserving other settings and a rollback copy.
+  const configPath = process.env.CLAUDE_CONFIG_DIR
+    ? join(process.env.CLAUDE_CONFIG_DIR, '.claude.json') : join(homedir(), '.claude.json');
+  let existing;
+  try { existing = JSON.parse(await readFile(configPath, 'utf8')); }
+  catch (error) { if (error.code !== 'ENOENT') throw new Error('Claude Code configuration could not be read; it was not changed.'); }
+  if (existing?.mcpServers?.usability) await mergeClaudeConfig(configPath, { type: 'stdio', ...entry });
+  else run('claude', claudeCodeArgs(entry));
+}
 export async function main(args) {
   const [command, ...flags] = args;
   if (!command || command === '--help' || command === 'help') {
-    console.log('Usability MCP\n  setup --host codex|claude|manual [--dir ABSOLUTE_PATH]\n  doctor\n  serve\n\nRequires Node 22+ and npm. Automated setup: macOS; Codex/manual also Linux.\nSetup installs a durable runtime and Chromium. Restart the host afterward.');
+    console.log('Usability MCP\n  setup --host codex|claude-code|claude-desktop|manual [--dir ABSOLUTE_PATH]\n  doctor [--native]\n  serve\n\nRequires Node 22+ and npm. Automated setup: macOS; Codex/Claude Code/manual also Linux.\nSetup installs a durable runtime and Chromium. Restart the host afterward.');
     return;
   }
   if (Number(process.versions.node.split('.')[0]) < 22) throw new Error('Node.js 22 or newer is required.');
   if (command === 'serve' && !flags.length) { await import('../dist/src/index.js'); return; }
+  if (command === 'doctor' && flags.length === 1 && flags[0] === '--native') {
+    run('maestro', ['--version']);
+    run('maestro', ['list-devices']);
+    console.log('Native adapter is experimental. Use a prepared disposable emulator/simulator with the app installed. No network isolation, app reset, or native accessibility audit is provided.');
+    return;
+  }
   if (command === 'doctor' && !flags.length) {
     const { chromium } = await import('playwright');
     const browser = await chromium.launch({ headless: true });
@@ -44,13 +64,14 @@ export async function main(args) {
   if (command !== 'setup') throw new Error('Unknown command. Run with --help.');
   const options = {};
   for (let i = 0; i < flags.length; i += 2) {
-    if (!['--host', '--dir'].includes(flags[i]) || !flags[i + 1] || flags[i + 1].startsWith('--') || options[flags[i]]) throw new Error('Use setup --host codex|claude|manual [--dir PATH].');
+    if (!['--host', '--dir'].includes(flags[i]) || !flags[i + 1] || flags[i + 1].startsWith('--') || options[flags[i]]) throw new Error('Use setup --host codex|claude-code|claude-desktop|manual [--dir PATH].');
     options[flags[i]] = flags[i + 1];
   }
-  const host = options['--host'];
-  if (!['codex', 'claude', 'manual'].includes(host)) throw new Error('Choose --host codex, claude, or manual.');
-  if (!['darwin', 'linux'].includes(process.platform) || (host === 'claude' && process.platform !== 'darwin')) throw new Error('This installer supports macOS, and Codex/manual on Linux. See README for manual configuration on other systems.');
+  const host = options['--host'] === 'claude' ? 'claude-desktop' : options['--host'];
+  if (!['codex', 'claude-code', 'claude-desktop', 'manual'].includes(host)) throw new Error('Choose --host codex, claude-code, claude-desktop, or manual.');
+  if (!['darwin', 'linux'].includes(process.platform) || (host === 'claude-desktop' && process.platform !== 'darwin')) throw new Error('This installer supports macOS, and Codex/manual on Linux. See README for manual configuration on other systems.');
   if (host === 'codex') run('codex', ['--version']);
+  if (host === 'claude-code') run('claude', ['--version']);
   run('npm', ['--version']);
   const destination = resolve(options['--dir'] || join(homedir(), '.local', 'share', 'usability-mcp'));
   const runtime = join(destination, 'runtime');
@@ -69,7 +90,8 @@ export async function main(args) {
     run(process.execPath, [join(installed, 'bin', 'usability-mcp.mjs'), 'doctor']);
     const entry = { command: process.execPath, args: [join(installed, 'dist', 'src', 'index.js')], env: { USABILITY_ARTIFACT_DIR: artifacts } };
     if (host === 'codex') run('codex', ['mcp', 'add', 'usability', '--env', `USABILITY_ARTIFACT_DIR=${artifacts}`, '--', entry.command, ...entry.args]);
-    if (host === 'claude') await mergeClaudeConfig(join(homedir(), 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json'), entry);
+    if (host === 'claude-code') await registerClaudeCode(entry);
+    if (host === 'claude-desktop') await mergeClaudeConfig(join(homedir(), 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json'), entry);
     if (host === 'manual') console.log(JSON.stringify({ mcpServers: { usability: entry } }, null, 2));
     console.log(`Installed. Reports and project profiles: ${artifacts}\n${host === 'manual' ? 'Add the configuration above to your MCP host.' : 'Registered usability with ' + host + '.'}\nRestart the host and enable the tools. Ask: “Set up a usability test for [URL].”\nNo model API keys required. Existing host tool permissions still apply.`);
   } finally { await rm(temp, { recursive: true, force: true }); }

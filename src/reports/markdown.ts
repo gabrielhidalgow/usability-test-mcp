@@ -9,7 +9,7 @@ function escape(value: string): string {
 export function renderMarkdown(report: UsabilityReport, directory: string): string {
   const link = (path: string) => `[Screenshot](${relative(directory, path).split('/').map(encodeURIComponent).join('/')})`;
   const lines = ['# Usability Test Report', '', report.disclaimer, '', '## Test setup', '',
-    `Product: ${escape(report.target)}`, '', 'Platform: web', '', `Date: ${report.generatedAt}`, '',
+    `Product: ${escape(report.target)}`, '', `Platform: ${report.platform ?? 'web'}`, '', `Date: ${report.generatedAt}`, '',
     `Scenario: ${escape(report.scenario)}`, '', `Goal: ${escape(report.goal)}`, '',
     '## Executive summary', '',
     `${report.sessions.length} synthetic session(s); ${report.sessions.filter(s => s.status === 'completed').length} reported completion; ${report.findings.length} evidence-linked usability finding(s).`, '',
@@ -20,6 +20,7 @@ export function renderMarkdown(report: UsabilityReport, directory: string): stri
   }
   for (const s of report.sessions) lines.push(`| ${escape(s.persona.name)} | ${s.status} | ${s.actions} | ${s.wrongTurns} | ${s.backtracks} |`);
   for (const s of report.sessions) lines.push('', `${escape(s.persona.name)} — ${escape(s.reason)} (provider: ${escape(s.provider)})`);
+  for (const s of report.sessions) if (s.continuation) lines.push('', `Continuation of ${s.continuation.previousSessionId}. Browser state reset; previous actions were not replayed. This segment is not an independent participant.${s.continuation.uncertainAction ? ' The last action in the prior segment had an uncertain result.' : ''}`);
   lines.push('', '## Most important findings', '');
   if (!report.findings.length) lines.push('No evidence-linked usability issues were reported. This is not evidence that the product has no issues.');
   for (const issue of report.findings) {

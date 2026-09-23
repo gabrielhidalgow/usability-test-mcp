@@ -6,33 +6,71 @@ A local-first MCP server for **synthetic usability testing** of websites and mob
 
 Synthetic participants are not real people. Their commentary and completion judgments must not be represented as real-user research. There is no overall usability score, and automated accessibility checks are not a WCAG conformance audit.
 
-## One-command setup from GitHub
+## Install once, test from chat
 
-Requires **Node.js 22+**, npm, Git, and an installed MCP-capable host. For Codex registration, the `codex` CLI must be on PATH. Private-repository installs also require Git authentication with access to the repository.
+Requires **Node.js 22+**, npm, Git, and the chosen host CLI. The GitHub repository is currently private: installers need repository access and Git authentication. No npm account, model API key or separate model billing is needed.
+
+**Codex:**
 
 ```bash
 npx --yes github:gabrielhidalgow/usability-mcp setup --host codex
 ```
 
-For Claude Desktop on macOS:
+**Claude Code:**
 
 ```bash
-npx --yes github:gabrielhidalgow/usability-mcp setup --host claude
+npx --yes github:gabrielhidalgow/usability-mcp setup --host claude-code
 ```
 
-The installer builds the GitHub source, installs a durable runtime and Chromium, checks that Chromium launches, then registers the server. Restart the host and enable its tools. Ask it to call `usability_health`, then say **“Set up a usability test for [URL].”** Host permissions and a restart can still require interaction; setup does not sign you into a chat subscription.
+**Claude Desktop on macOS:** use `--host claude-desktop`. The old `--host claude` alias still means Desktop, not Claude Code.
 
-The default installation is `~/.local/share/usability-mcp/`, with saved profiles and reports under `artifacts/`. Use `--dir "/absolute/path"` to change it. Re-running setup updates the runtime and preserves artifacts. Stop active tests before updating. The configured Node executable must remain installed at its original path; rerun setup after moving Node.
+The command builds a durable local copy, installs Chromium, checks the browser, and registers the MCP with the selected host. Restart the host / refresh its MCP connection and enable its tools. In Claude Code check `/mcp`; ask either host to call `usability_health`.
 
-Automatic registration supports Codex on macOS/Linux and Claude Desktop on macOS. `--host manual` installs and prints configuration for other compatible local hosts on macOS/Linux. On Linux, missing browser system libraries may need administrator installation separately; the browser check will report failure. Windows automatic installation is not included. This installs a local stdio MCP server, not a remote ChatGPT connector.
+Then just ask:
 
-Claude configuration is merged and backed up alongside its existing file; other entries are preserved. The named `usability` entry is replaced on update. Codex registration uses its official `codex mcp add` command. Test reports and profiles are not included in the distributable package.
+> Quickly test https://example.com on mobile. The user is a first-time visitor trying to find the right plan and its monthly cost.
 
-For a reproducible release, replace `github:gabrielhidalgow/usability-mcp` with `github:gabrielhidalgow/usability-mcp#COMMIT_OR_TAG`. The repository must be accessible to the person installing; public sharing and npm registry publication are separate steps. No npm registry release is required for GitHub installation.
+The host calls `usability_quick_test`, observes screenshots, chooses each action, and returns the report. Quick mode uses one participant, up to 12 actions, ten minutes, and no axe scan unless requested. It requires a goal; it does not invent one or require a saved profile. Use the guided project questionnaire when you want a reusable plan.
 
-To uninstall, remove the `usability` entry from your host (Codex: `codex mcp remove usability`) and delete the installation's `runtime/` folder. Keep `artifacts/` if you want to retain your reports and profiles. Chromium's shared Playwright cache is left intact.
+`device: "mobile"` means a phone-sized Chromium browser, not native iOS/Android or actual Mobile Safari. Desktop and mobile web share the same browser policy and evidence/report pipeline.
 
-For local development, build first and run `node bin/usability-mcp.mjs setup --host manual`. The commands below are for contributors rather than end users.
+## Continue an interrupted web test
+
+Ask: **“Continue session-… from where it stopped.”** `usability_continue_session` reads its saved checkpoint after restart, opens the last observed same-origin URL in a fresh browser and includes only that participant's prior decisions/history. It never replays a click, resubmits a form or copies old findings into participant context. Active runs should use `usability_get_session_state`; cancel them before continuing. Completed runs cannot be continued.
+
+This is a **linked continuation segment**, not restoration of cookies, login, form values, scroll position or back history. Reports store the parent/root IDs and clearly label the reset. If the last action's result is unknown, that uncertainty is retained. Reassess the current UI before acting. Capability overrides are reset to default-deny. Native continuation is not yet supported.
+
+Web captures now wait briefly for visible layout, fonts and finite animations. The wait is bounded at roughly two seconds and does not disable animations or wait indefinitely for network idle. Unsettled captures are flagged for review; automated contrast findings during transitions should be rechecked.
+
+## Native apps — experimental
+
+The same MCP includes `usability_run_native`, an experimental screenshot-driven adapter for **local Maestro**. It does not use Maestro Cloud or model APIs. You must separately install [Maestro and its prerequisites](https://docs.maestro.dev/get-started/installing-maestro), boot a disposable Android emulator or iOS simulator, and install a sandbox build of your app. Native prerequisites and a real device are not installed by the MCP setup command.
+
+Check the setup with:
+
+```bash
+npx --yes github:gabrielhidalgow/usability-mcp doctor --native
+```
+
+Then ask your host to test an app by providing its app/bundle ID, device ID, operating system, audience and goal, and confirming that the device is prepared for testing. The tool requires `preparedTestDevice: true`.
+
+The host receives a screenshot, chooses `tap_point` using normalized coordinates plus the visible control label, or `enter_text` after focusing a non-sensitive field. Scroll and Android back are supported. iOS back uses the visible back control. No source code, hidden hierarchy IDs or predetermined flow is provided to the participant.
+
+**Limits:** this adapter is tested with a labelled command-runner fixture, not a real device on the development machine (Maestro, Java and simulator were unavailable). Treat it as experimental until your device smoke test passes. There is no native network interception, independent verification of tap labels, screenshot masking, app-data isolation/reset, or native accessibility audit. Permissions are denied at launch; permission-dependent features may be unavailable. The adapter does not stop or clear the app at session end. Use fake data and a prepared sandbox app; do not use personal devices or production accounts. Concurrent use of the same device is prevented only within one server process. Native rounds and saved native project profiles are not yet supported.
+
+See [Maestro commands](https://docs.maestro.dev/maestro-cli/maestro-cli-commands-and-options) and [Claude Code MCP configuration](https://code.claude.com/docs/en/mcp) for the underlying local integrations.
+
+## Installation details
+
+Default runtime: `~/.local/share/usability-mcp/runtime/`. Reports and profiles: `~/.local/share/usability-mcp/artifacts/`. Use `--dir "/absolute/path"` to change it. Stop active tests before updating; rerun setup to update while retaining artifacts. Host registration uses absolute Node/server paths; rerun setup if you move Node.
+
+Automatic setup supports Codex and Claude Code on macOS/Linux, and Claude Desktop on macOS. `--host manual` prints configuration for another local MCP host. Linux may require separate administrator installation of Chromium system libraries; `doctor` reports browser launch failures. Windows automatic setup and remote-only chat connections are not included.
+
+Claude configurations are merged with a backup when updating an existing entry; unrelated settings remain intact. Codex uses `codex mcp add`. Claude Code registers the server in **user scope** so it is available across projects. Existing entries named `usability` are updated. Reports, screenshots, tokens and local test data are excluded from the distributable.
+
+For a pinned version append `#COMMIT_OR_TAG` to the GitHub package spec. Public distribution requires making the repository public or granting access; no npm registry publication is needed. The repository's `private` package flag prevents accidental npm publishing.
+
+To uninstall, remove the MCP entry (`codex mcp remove usability` or `claude mcp remove --scope user usability`) and delete the installation's `runtime/` folder. Keep `artifacts/` to retain reports. Shared Playwright browser caches are left intact.
 
 ## Install and verify
 
@@ -130,6 +168,9 @@ For a keyboard journey, ask for `usability_run_accessibility` with the same pers
 | Tool | Behavior |
 | --- | --- |
 | `usability_health` | Local status and API-free host reasoning mode |
+| `usability_quick_test` | Start a desktop or mobile-web journey from a URL, goal, and audience |
+| `usability_continue_session` | Start a linked segment of an interrupted web journey with its saved history and a fresh browser |
+| `usability_run_native` | Start an experimental native journey on a prepared Maestro test device |
 | `usability_run_session` | Start one participant; returns screenshot and first decision request |
 | `usability_run_round` | Start three participants by default; fresh browser contexts and combined report |
 | `usability_run_accessibility` | Start a keyboard-only journey with axe scans |
@@ -141,13 +182,13 @@ For a keyboard journey, ask for `usability_run_accessibility` with the same pers
 
 `examples/session.json` is a complete session input. The authoritative Zod schema is `src/config/schema.ts`; MCP `tools/list` publishes its JSON Schema. Unknown fields are rejected.
 
-Required session fields: `target`, `persona.context`, `scenario`, `goal`. Defaults: web, desktop, 30 actions, 180 seconds, accessibility checks enabled, standard interaction mode, no consequential capabilities. `platform: "mobile"` is intentionally rejected; `viewport: "mobile"` means mobile web.
+Required session fields: `target`, `persona.context`, `scenario`, `goal`. Defaults: web, desktop, 30 actions, 180 seconds, accessibility checks enabled, standard interaction mode, no consequential capabilities. `platform: "mobile"` is rejected; `viewport: "mobile"` means mobile web. Use `usability_run_native` for the separate experimental native driver.
 
 Round inputs replace `persona` with optional `personas`, `participantCount` (default 3, maximum 5), and `personaContext`. If you supply personas, their count must equal `participantCount`. Generated personas vary task-relevant technical confidence and constraints; they are templates, not demographic representation. The server resets browser storage and the supplied history per participant, but cannot reset the host's chat memory. Sessions run sequentially; `timeoutMs` includes time waiting for the chat's decisions and findings. Use up to 600000 ms for longer chat journeys.
 
 Follow-up tools require the returned `runId` and `requestId`. A consumed request cannot execute twice. At `awaiting_decision`, submit a `decision` matching the published tool schema (state summary, simulated commentary, selected action, confidence, nullable expectation/friction, behavior). At `awaiting_findings`, submit up to eight evidence-linked `findings`, or `[]`. The next response is either another participant's observation or the completed report. Do not call the start tool repeatedly to advance an existing run.
 
-Abandoned runs time out and save partial reports. Live runs are held in memory and cannot resume after a server restart; saved artifacts remain readable. At most four runs are active at once; the last 24 active/completed run states are cached. On connection shutdown the server cancels pending work and closes browsers. Use `usability_cancel_session` before leaving a test unfinished.
+Abandoned runs time out and save partial reports. Live browser state is held in memory and cannot be restored after a server restart. Saved artifacts remain readable; `usability_continue_session` can start a linked web segment with the saved participant history in a fresh browser. At most four runs are active at once; the last 24 active/completed run states are cached. On connection shutdown the server cancels pending work and closes browsers. Use `usability_cancel_session` before leaving a test unfinished.
 
 Session status is `completed`, `incomplete`, `blocked`, `timeout`, `cancelled`, or `error`. Completion is the model's evidence-grounded judgment. Round status describes execution (`finished`, `partial`, `cancelled`); inspect individual outcomes rather than treating `finished` as task success.
 
@@ -186,6 +227,8 @@ Reports keep executed actions, action results, simulated commentary, interpretat
 
 ## Safety and limitations
 
+The browser guards below apply to web runs. Native runs have the separate experimental limitations described above, including no HTTP interception or screenshot masking.
+
 - Use local/disposable fixtures or a staging environment you are authorized to test. Browser interaction can change application state even though the server never edits target source files.
 - Consequential labels, off-origin navigation, non-HTTP navigation, downloads, popups, WebSockets, and unapproved non-read HTTP requests are guarded. Service workers are blocked. This can prevent legitimate apps from loading or completing a task.
 - Overrides require **both** `testEnvironment: true` and explicit `allowedCapabilities`: `formSubmission`, `accountCreation`, `communication`, `publicPosting`, `deletion`, `accountClosure`, `payment`. Enable only for fake data and sandbox services. Never enable payment against real money or communication against real recipients.
@@ -201,7 +244,7 @@ Reports keep executed actions, action results, simulated commentary, interpretat
 
 Implemented: host-driven participant loop; screenshots and visible observations returned directly in MCP results; browser isolation; reports; axe and keyboard interaction; rounds and conservative synthesis; MCP tools/resources/prompts; cancellation and duplicate-action protection. Verified with automated fixture and MCP transport tests, not real-human studies or every individual chat product's UI.
 
-Deferred: native Maestro execution, product-discovery and separate first-impression/exploratory tools, automatic round comparison, additional reasoning providers, trace/video capture, and expanded accessibility interaction analysis. The `ProductDriver` abstraction includes the mobile extension point; this release does not claim native-mobile support. No dashboards, cloud infrastructure, billing, accounts, or CI/CD are included.
+Deferred: native real-device validation, native rounds/profile support, product-discovery and separate first-impression/exploratory tools, automatic round comparison, additional reasoning providers, trace/video capture, and expanded accessibility interaction analysis. The `ProductDriver` abstraction includes the mobile extension point; native support is experimental and requires the separately prepared Maestro device described above. No dashboards, cloud infrastructure, billing, accounts, or CI/CD are included.
 
 ## Development
 
@@ -254,4 +297,4 @@ Saved-project runs accept an optional `options` object with `timeoutMs` (up to 6
 }
 ```
 
-These options are recorded alongside the approved plan in the run's `project.json`. They do not enable consequential capabilities or change the plan's target, persona, scenario or goal. Browser state still cannot resume after a stopped run or server restart; a continuation must be explicitly reported as a new session, not as an uninterrupted journey or an independent new participant.
+These options are recorded alongside the approved plan in the run's `project.json`. They do not enable consequential capabilities or change the plan's target, persona, scenario or goal. Use `usability_continue_session` for a linked web continuation with a fresh browser. It is not an uninterrupted journey or an independent new participant.

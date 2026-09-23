@@ -5,6 +5,9 @@ import type { AccessibilityScan, AccessibilitySnapshot, ActionResult, EvidenceAr
 export type DriverStartConfig = { input: SessionInput; directory: string; signal: AbortSignal };
 export interface ProductDriver {
   readonly kind: 'web' | 'mobile';
+  readonly limitations?: string[];
+  tapPoint?(x: number, y: number): Promise<ActionResult>;
+  enterText?(value: string): Promise<ActionResult>;
   takePolicyDiagnostics?(): PolicyDiagnostic[];
   start(config: DriverStartConfig): Promise<void>;
   stop(): Promise<void>;

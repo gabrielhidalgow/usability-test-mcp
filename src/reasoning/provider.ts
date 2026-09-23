@@ -1,8 +1,9 @@
 import type { Persona } from '../config/schema.js';
-import type { Interpretation, JourneyStep, ParticipantDecision, ProductObservation, SessionRecord, UsabilityReport } from '../core/types.js';
+import type { Continuation, PriorHistory, Interpretation, JourneyStep, ParticipantDecision, ProductObservation, SessionRecord, UsabilityReport } from '../core/types.js';
 
 export type ParticipantDecisionInput = {
   sessionId: string;
+  continuation?: Continuation; priorHistory?: PriorHistory[];
   persona: Persona; scenario: string; goal: string; interactionMode: 'standard' | 'keyboard';
   observation: ProductObservation; history: JourneyStep[]; signal: AbortSignal;
 };

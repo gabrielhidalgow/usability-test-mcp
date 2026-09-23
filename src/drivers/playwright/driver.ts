@@ -141,8 +141,40 @@ export class PlaywrightProductDriver implements ProductDriver {
       }
     }
   }
+  private async settleVisiblePage(): Promise<NonNullable<ProductObservation['capture']>> {
+    // Bounded quiet-window sampling: do not disable animation or wait for network idle.
+    const page = this.currentPage();
+    return page.evaluate(async () => {
+      const start = performance.now();
+      const budget = 2000;
+      let previous = ''; let quietSince = start;
+      while (performance.now() - start < budget) {
+        const visible = Array.from(document.querySelectorAll('h1,h2,h3,p,a,button,input,[role]')).filter(node => {
+          const r = node.getBoundingClientRect();
+          return r.width > 0 && r.height > 0 && r.top < innerHeight && r.bottom > 0 && r.left < innerWidth && r.right > 0;
+        }).slice(0, 160);
+        const signature = JSON.stringify(visible.map(node => {
+          const r = node.getBoundingClientRect(); const s = getComputedStyle(node);
+          return [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height), s.opacity, s.visibility, (node as HTMLElement).innerText?.slice(0, 200)];
+        }));
+        const finiteAnimations = document.getAnimations().some(a => {
+          const target = (a.effect as KeyframeEffect | null)?.target;
+          if (!(target instanceof Element) || a.playState !== 'running') return false;
+          const r = target.getBoundingClientRect();
+          return r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth && a.effect?.getTiming().iterations !== Infinity;
+        });
+        const ready = document.readyState !== 'loading' && document.fonts.status === 'loaded';
+        if (signature !== previous || finiteAnimations || !ready) quietSince = performance.now();
+        previous = signature;
+        if (performance.now() - start >= 450 && performance.now() - quietSince >= 300) return { settled: true, waitedMs: Math.round(performance.now() - start), reason: 'Visible layout and finite animations settled' };
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      return { settled: false, waitedMs: Math.round(performance.now() - start), reason: 'Capture budget reached; transient content may remain' };
+    });
+  }
   private async readObservation(): Promise<ProductObservation> {
     const page = this.currentPage();
+    const capture = await this.settleVisiblePage();
     for (const { element } of this.targets.values()) await element.dispose().catch(() => {});
     this.targets.clear();
     const epoch = ++this.observationSequence;
@@ -188,7 +220,7 @@ export class PlaywrightProductDriver implements ProductDriver {
     return { timestamp: new Date().toISOString(), location: await this.getCurrentLocation(), title: redact(await page.title()),
       visibleText: redact(visibleText), semantics: await this.getAccessibilitySnapshot(),
       candidates: [...this.targets.values()].map(t => t.candidate),
-      viewport: page.viewportSize()!, screenshot: await this.screenshot(), dialogs: this.dialogs.splice(0) };
+      viewport: page.viewportSize()!, capture, screenshot: await this.screenshot(), dialogs: this.dialogs.splice(0) };
   }
   private async perform(operation: () => Promise<unknown>): Promise<ActionResult> {
     this.currentPage(); this.denied = [];

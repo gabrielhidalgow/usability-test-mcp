@@ -23,6 +23,12 @@ export function guardAction(action: Action, observation: ProductObservation, inp
     return 'Keyboard sessions cannot click or tap.';
   }
   let label = '';
+  if (action.type === 'tap_point' || action.type === 'enter_text') {
+    if (input.platform !== 'native') return 'Coordinate and native text actions require a native test session.';
+    label = action.visibleLabel;
+    if (action.type === 'enter_text' && /password|secret|api.?key|credit.?card|card.?number|cvv/i.test(label)) return 'Secret and payment fields are excluded.';
+  }
+
   if ('target' in action) {
     const target = observation.candidates.find(x => x.ref === action.target);
     if (!target) return 'The selected target is not in the current visible observation.';

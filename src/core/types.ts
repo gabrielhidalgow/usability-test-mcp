@@ -4,6 +4,8 @@ import { capabilitySchema, type Persona, type SessionInput } from '../config/sch
 export const categorySchema = z.enum(['navigation', 'comprehension', 'affordance', 'content', 'form',
   'feedback', 'error-recovery', 'trust', 'accessibility', 'visual-hierarchy', 'other']);
 export const actionSchema = z.discriminatedUnion('type', [
+  z.strictObject({ type: z.literal('tap_point'), x: z.number().min(0).max(1), y: z.number().min(0).max(1), visibleLabel: z.string().min(1).max(300), capability: capabilitySchema.nullable() }),
+  z.strictObject({ type: z.literal('enter_text'), value: z.string().max(2000).refine(v => !v.includes('${'), 'Maestro expressions are not allowed'), visibleLabel: z.string().min(1).max(300), capability: capabilitySchema.nullable() }),
   z.strictObject({ type: z.literal('click'), target: z.string(), capability: capabilitySchema.nullable() }),
   z.strictObject({ type: z.literal('tap'), target: z.string(), capability: capabilitySchema.nullable() }),
   z.strictObject({ type: z.literal('type'), target: z.string(), value: z.string().max(2000), capability: capabilitySchema.nullable() }),
@@ -35,6 +37,7 @@ export type ProductObservation = {
   semantics: AccessibilitySnapshot; candidates: Candidate[];
   viewport: { width: number; height: number }; screenshot: EvidenceArtifact;
   dialogs: string[];
+  capture?: { settled: boolean; waitedMs: number; reason: string };
 };
 export type PolicyDiagnostic = {
   reason: 'unsupported-protocol' | 'credentialed-url' | 'cross-origin-navigation' | 'capability-denied' | 'mutation-denied';
@@ -61,6 +64,8 @@ export type UsabilityIssue = Interpretation & {
   evidence: { sessionId: string; stepNumbers: number[]; screenshots: string[] }[];
 };
 export type SessionStatus = 'completed' | 'incomplete' | 'blocked' | 'timeout' | 'cancelled' | 'error';
+export type Continuation = { previousSessionId: string; rootSessionId: string; previousStatus: SessionStatus; browserStateRestored: false; uncertainAction: boolean };
+export type PriorHistory = { sessionId: string; steps: Pick<JourneyStep, 'step' | 'decision' | 'result'>[] };
 export type SessionRecord = {
   id: string; kind: 'session'; startedAt: string; finishedAt: string;
   input: SessionInput; provider: string; status: SessionStatus; reason: string;
@@ -68,12 +73,13 @@ export type SessionRecord = {
   accessibility: AccessibilityScan[]; warnings: string[];
   policyDiagnostics?: (PolicyDiagnostic & { step: number })[];
   failureStage?: string;
+  continuation?: Continuation;
 };
 export type UsabilityReport = {
   id: string; kind: 'session' | 'round'; synthetic: true; generatedAt: string;
-  target: string; scenario: string; goal: string; disclaimer: string;
+  platform?: 'web' | 'native'; target: string; scenario: string; goal: string; disclaimer: string;
   sessions: { id: string; persona: Persona; status: SessionStatus; reason: string;
-    actions: number; wrongTurns: number; backtracks: number; provider: string }[];
+    continuation?: Continuation; actions: number; wrongTurns: number; backtracks: number; provider: string }[];
   findings: UsabilityIssue[]; accessibility: (AccessibilityScan & { sessionId: string })[];
   journeys: { sessionId: string; steps: JourneyStep[] }[];
   limitations: string[];

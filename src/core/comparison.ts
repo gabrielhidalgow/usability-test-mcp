@@ -1,3 +1,4 @@
+import { contextQuality } from './context-quality.js';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { EvidenceRecorder, artifactIdSchema } from '../evidence/recorder.js';
@@ -37,8 +38,7 @@ export function initializeComparison(report: UsabilityReport): Comparison {
   const participants: Comparison['participants'] = [];
   for (const session of report.sessions) {
     const participantId = session.continuation?.rootSessionId ?? session.id;
-    const declarations = report.journeys.find(j => j.sessionId === session.id)?.steps.map(s => s.decision.contextIsolation) ?? [];
-    const isolation = declarations.includes('shared') ? 'shared' : declarations[0] === 'host-reported fresh' ? 'host-reported fresh' : 'unknown';
+    const isolation = contextQuality(report, session).isolation as Comparison['participants'][number]['contextIsolation'];
     const prior = participants.find(p => p.participantId === participantId);
     if (prior) {
       prior.sessionIds.push(session.id);
@@ -64,6 +64,7 @@ export class ComparisonReviews {
   constructor(private recorder: EvidenceRecorder) {}
   private async load(id: string): Promise<UsabilityReport & { comparison: Comparison }> {
     const report = JSON.parse(await this.recorder.read(id, 'json')) as UsabilityReport;
+    if (report.supersededBy) throw new ReviewError(`This run was superseded by ${report.supersededBy}; review its replacement instead.`);
     if (report.kind !== 'round' || !report.comparison) throw new ReviewError('This report has no comparison workflow. Run a new web round.');
     return report as UsabilityReport & { comparison: Comparison };
   }

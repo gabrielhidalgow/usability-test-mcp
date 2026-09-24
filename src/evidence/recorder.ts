@@ -32,7 +32,18 @@ export class EvidenceRecorder {
   async checkpoint(session: SessionRecord): Promise<void> {
     await this.json(this.paths(session.id).journey, session);
   }
+  async provenance(report: UsabilityReport): Promise<UsabilityReport> {
+    for (const [file, key] of [['correction.json', 'correction'], ['superseded.json', 'supersededBy']] as const) {
+      try {
+        const saved = JSON.parse(await readFile(join(this.paths(report.id).directory, file), 'utf8'));
+        if (key === 'correction') report.correction = saved;
+        else report.supersededBy = saved.supersededBy;
+      } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+    }
+    return report;
+  }
   async finish(report: UsabilityReport): Promise<ArtifactPaths> {
+    await this.provenance(report);
     const paths = this.paths(report.id);
     await this.json(paths.json, report);
     await writeFile(paths.details, redact(renderDetailedMarkdown(report, paths.directory)), { mode: 0o600 });
@@ -41,13 +52,9 @@ export class EvidenceRecorder {
   }
   async read(id: string, format: 'json' | 'markdown' | 'details' | 'journey'): Promise<string> {
     const paths = this.paths(id);
-    if (format === 'details') {
-      try { return await readFile(paths.details, 'utf8'); }
-      catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-        return redact(renderDetailedMarkdown(JSON.parse(await readFile(paths.json, 'utf8')), paths.directory));
-      }
-    }
-    return readFile(format === 'json' ? paths.json : format === 'markdown' ? paths.report : paths.journey, 'utf8');
+    if (format === 'journey') return readFile(paths.journey, 'utf8');
+    const report = await this.provenance(JSON.parse(await readFile(paths.json, 'utf8')));
+    if (format === 'json') return JSON.stringify(report, null, 2);
+    return redact(format === 'details' ? renderDetailedMarkdown(report, paths.directory) : renderMarkdown(report, paths.directory));
   }
 }

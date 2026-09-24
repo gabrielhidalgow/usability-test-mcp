@@ -1,3 +1,4 @@
+import { contextQuality } from '../core/context-quality.js';
 import { relative } from 'node:path';
 import type { SuggestedChange, UsabilityReport } from '../core/types.js';
 
@@ -11,12 +12,20 @@ type ActionItem = { title: string; why: string; recommendation: string; severity
   confidence?: string; source: string; screenshot?: string; change?: SuggestedChange; counterpoint?: string };
 
 export function renderExecutiveMarkdown(report: UsabilityReport, directory: string): string {
+  if (report.supersededBy) return [
+    '# Usability Test — Superseded attempt', '',
+    `This attempt was replaced by **${report.supersededBy}**.`, '',
+    '**Excluded from current participant counts, completion summaries and recurring patterns.** Do not combine this attempt with its replacement. The replacement may still be incomplete.', '',
+    '[Archived evidence and correction details](details.md) · [Structured report](report.json)', '',
+  ].join('\n');
   const screenshot = (path: string) => `[Screenshot](${relative(directory, path).split('/').map(encodeURIComponent).join('/')})`;
   const rootId = (id: string) => report.sessions.find(s => s.id === id)?.continuation?.rootSessionId ?? id;
   const participants = new Map<string, (typeof report.sessions)[number]>();
   for (const session of report.sessions) participants.set(rootId(session.id), session);
   const outcomes = [...participants.values()];
   const completed = outcomes.filter(s => s.status === 'completed').length;
+  const quality = outcomes.map(s => contextQuality(report, s));
+  const firstVisitSupported = quality.length > 0 && quality.every(q => q.firstVisitSupported);
   const comparison = report.comparison;
   const pending = comparison && comparison.nextStage !== 'complete';
   const grouped = new Set(comparison?.patterns.flatMap(p => p.findingIds) ?? []);
@@ -56,6 +65,15 @@ export function renderExecutiveMarkdown(report: UsabilityReport, directory: stri
     `**Audience:** ${compact([...new Set(outcomes.map(s => s.persona.context))].join('; '), 180)}`, '',
     '**Evidence from synthetic participants, not human research.** Completion and findings are model judgments.', ''];
   if (report.sessions.some(s => s.provider.includes('test-double'))) lines.push('**DEMO / TEST DOUBLE — fixture verification, not AI usability research.**', '');
+  const contexts = [...new Set(quality.map(q => q.isolation))].join(', ') || 'unknown';
+  const gaps = [completed < outcomes.length ? `${outcomes.length - completed} incomplete journey(s)` : '',
+    report.policyDiagnostics?.length ? `${report.policyDiagnostics.length} browser restriction(s)` : '',
+    /\b(pdf|download|data\s?sheet)\b/i.test(`${report.goal} ${report.scenario}`) ? 'PDF/download completion is unsupported' : ''].filter(Boolean);
+  lines.push('## How to interpret this test', '',
+    `- **Method:** ${quality.some(q => q.method === 'informed walkthrough') ? 'Includes informed walkthroughs' : 'Simulated journeys'}; no real participants.`,
+    `- **Context:** ${contexts} (host-reported, not independently verified).${firstVisitSupported ? '' : ' First-visit conclusions are withheld.'}`,
+    `- **Coverage gaps:** ${gaps.join('; ') || 'None recorded; this does not establish complete coverage.'}`,
+    `- **Corrections:** ${report.correction ? `Replaces an earlier attempt (${compact(report.correction.reason, 60)}). Earlier results are excluded; details are in the appendix.` : 'No replacement attempt recorded.'}`, '');
   lines.push('## At a glance', '',
     `**Outcome:** Reported completion in ${completed} of ${outcomes.length} simulated journeys.${completed < outcomes.length ? ' Other journeys remain incomplete or inconclusive; see outcomes below.' : ''}`, '');
   if (pending) lines.push(`**Provisional report:** ${comparison.nextStage} review is pending. Finish the review before prioritising changes.`, '');

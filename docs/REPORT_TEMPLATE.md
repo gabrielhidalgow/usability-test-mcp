@@ -5,6 +5,15 @@
 
 Synthetic participants, not human research. Reported completion and findings are model judgments.
 
+## How to interpret this test
+
+- **Method:** [Simulated journeys or informed walkthroughs; no real participants.]
+- **Context:** [Fresh / shared / unknown; host-reported, not independently verified. Withhold first-visit conclusions for contaminated or unknown contexts.]
+- **Coverage gaps:** [Incomplete journeys and unsupported or blocked parts of the task.]
+- **Corrections:** [Any superseded attempt; detailed reasons and changes belong in the appendix.]
+
+A superseded report contains only an archive notice and evidence link in place of current outcomes or recommendations. Never pool superseded attempts with replacements.
+
 ## At a glance
 
 **Outcome:** [Reported completions; identify incomplete or inconclusive journeys.]  

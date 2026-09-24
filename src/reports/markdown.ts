@@ -22,6 +22,11 @@ export function renderDetailedMarkdown(report: UsabilityReport, directory: strin
     `${report.sessions.length} synthetic session(s); ${report.sessions.filter(s => s.status === 'completed').length} reported completion; ${report.findings.length} evidence-linked usability finding(s).`, '',
     '## Task outcomes', '', '| Participant | Outcome | Actions | Simulated wrong turns | Backtracks |',
     '| --- | --- | --- | --- | --- |'];
+  if (report.supersededBy) lines.splice(4, 0, `**ARCHIVED ATTEMPT — superseded by ${escape(report.supersededBy)}. All counts and findings below are historical evidence, excluded from current conclusions.**`, '');
+  if (report.correction) lines.splice(4, 0, '## Correction history', '',
+    `Replaces: ${escape(report.correction.priorRunId)}. Reason: ${escape(report.correction.reason)}. Recorded: ${escape(report.correction.recordedAt)}.`, '',
+    `Host explanation: ${escape(report.correction.changes)}`, '',
+    `Recorded input fields changed: ${report.correction.changedFields.map(escape).join(', ') || 'none'}. Prior screenshots and journeys remain in the previous attempt. This replacement does not add participants.`, '');
   if (report.sessions.some(s => s.provider.startsWith('deterministic-fixture-test-double'))) {
     lines.splice(2, 0, '**DEMO / TEST DOUBLE: these journeys exercise the fixture and are not AI usability research.**', '');
   }
@@ -64,6 +69,7 @@ export function renderDetailedMarkdown(report: UsabilityReport, directory: strin
     }
   }
   for (const s of report.sessions) {
+    if (s.contextCheck) lines.push('', `Context declaration: ${escape(s.contextCheck.mode)}; ${escape(s.contextCheck.isolation)}. Current-context exposure: ${s.contextCheck.exposure.map(escape).join(', ') || 'none reported'}. Freshness is not independently verified.`);
     if (s.presentation) lines.push('', `Browser presentation: ${s.presentation}.`);
     if (s.handoff) lines.push('', `Setup discovery: ${s.handoff.discoveryId}. Context handoff: ${s.handoff.context} (host-reported, not independently verified). Discovery screens and suggested routes were excluded from participant packets.${s.handoff.startingStateConfirmed ? ' Native starting state confirmed by host; no automatic data reset or isolation.' : ''}`);
   }

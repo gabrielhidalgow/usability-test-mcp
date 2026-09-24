@@ -45,11 +45,36 @@ test('approved native profiles require a confirmed starting state and remain sin
   const root=await mkdtemp(join(tmpdir(),'native-profile-'));
   try {
     const profiles=new ProjectProfiles(root);
-    const draft=await profiles.save({name:'Native fixture',platform:'native',target:'com.example.fixture',native:{deviceId:'emulator-5554',os:'android',preparedTestDevice:true},answers:{purpose:'Fixture',audience:'Visitor',priority:'Read',success:'Visible text',boundaries:'Sandbox only'},personas:[{context:'Visitor'},{context:'Another visitor'}],journeys:[{id:'read',scenario:'First use',goal:'Read the welcome screen',successCriteria:['Welcome text visible']}]});
+    const draft=await profiles.save({name:'Native fixture',platform:'native',target:'com.example.fixture',native:{deviceId:'emulator-5554',os:'android',preparedTestDevice:true},answers:{purpose:'Fixture',audience:'Visitor',priority:'Read',success:'Visible text',boundaries:'Sandbox only'},personas:[{id:'visitor',context:'Visitor'},{id:'another',context:'Another visitor'}],journeys:[{id:'read',personaIds:['visitor','another'],scenario:'First use',goal:'Read the welcome screen',successCriteria:['Welcome text visible']}]});
     const approved=await profiles.approve(draft.id);
     assert.throws(()=>projectRun(approved,'read',1),/starting state/);
     const run=projectRun(approved,'read',1,{startingStateConfirmed:true});
     assert.equal(run.input.platform,'native');assert.equal(run.input.accessibilityChecks,false);
     assert.throws(()=>projectRun(approved,'read',2,{startingStateConfirmed:true}),/one participant/);
   } finally {await rm(root,{recursive:true,force:true});}
+});
+
+test('journeys select stable profile IDs, not names or array position; ambiguous legacy plans stop', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'assignments-'));
+  try {
+    const store = new ProjectProfiles(root);
+    const plan = { name: 'Flooring', target: 'https://example.com', answers: { purpose: 'Flooring', audience: 'Installers and specifiers', priority: 'Data sheets', success: 'Visible entry', boundaries: 'Read only' },
+      personas: [{ id: 'specifier', name: 'Visitor', context: 'A specifier' }, { id: 'installer', name: 'Visitor', context: 'An installer' }],
+      journeys: [{ id: 'data-sheet', personaIds: ['installer'], scenario: 'On site', goal: 'Find a data sheet entry', successCriteria: ['Entry visible'] }] };
+    const draft = await store.save(plan); const approved = await store.approve(draft.id);
+    const run = projectRun(approved, 'data-sheet', 1);
+    assert.equal(run.kind, 'session');
+    if (run.kind === 'session') assert.equal(run.input.persona.id, 'installer');
+    assert.deepEqual(run.assignment.participants, [{ id: 'installer', name: 'Visitor' }]);
+    assert.throws(() => projectRun(approved, 'data-sheet', 2), /assigned persona/);
+    await assert.rejects(store.save({ ...plan, journeys: [{ ...plan.journeys[0], personaIds: ['missing'] }] }));
+    await assert.rejects(store.save({ ...plan, personas: [plan.personas[0], plan.personas[0]] }));
+    await assert.rejects(store.save({ ...plan, journeys: [{ ...plan.journeys[0], personaIds: ['installer', 'installer'] }] }));
+    const legacy = { ...approved, plan: { ...approved.plan, journeys: approved.plan.journeys.map(j => ({ ...j, personaIds: undefined })) } };
+    assert.throws(() => projectRun(legacy, 'data-sheet', 1), /no participant assignment/);
+    const comparison = await store.save({ ...plan, journeys: [{ ...plan.journeys[0], personaIds: ['installer', 'specifier'] }] });
+    const round = projectRun(await store.approve(comparison.id), 'data-sheet', 2);
+    if (round.kind !== 'round') assert.fail('Expected round');
+    assert.deepEqual(round.input.personas?.map(p => p.id), ['installer', 'specifier']);
+  } finally { await rm(root, { recursive: true, force: true }); }
 });

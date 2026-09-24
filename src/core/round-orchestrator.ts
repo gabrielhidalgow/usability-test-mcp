@@ -8,11 +8,11 @@ import { synthesizeReports } from './synthesis.js';
 
 export class RoundOrchestrator {
   constructor(private readonly recorder: EvidenceRecorder, private readonly sessions: SessionOrchestrator) {}
-  async run(rawInput: unknown, providerFactory: () => ReasoningProvider, signal?: AbortSignal, onCreated?: (id: string) => void) {
+  async run(rawInput: unknown, providerFactory: () => ReasoningProvider, signal?: AbortSignal, onCreated?: (id: string) => void | Promise<void>) {
     const input = roundInputSchema.parse(rawInput);
     const { id, paths } = await this.recorder.create('round');
-    onCreated?.(id);
-    const { personas: supplied, participantCount, personaContext, ...shared } = input;
+    await onCreated?.(id);
+    const { personas: supplied, participantCount, personaContext, rerun: _rerun, ...shared } = input;
     const variations = [
       { technicalConfidence: 'average', constraints: ['using the product for the first time', 'limited time to scan the interface'] },
       { technicalConfidence: 'low', constraints: ['using the product for the first time', 'unfamiliar with this product category'] },

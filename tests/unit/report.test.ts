@@ -70,3 +70,27 @@ test('unsupported current copy is omitted and executive reports keep uncertainty
   assert(!md.includes('Invented current label'));
   assert.match(md, /Automated accessibility was not assessed/);
 });
+
+test('report quality distinguishes informed and unknown contexts and withholds first-visit claims', () => {
+  const original = session('one');
+  original.input.contextCheck = { mode: 'informed-walkthrough', isolation: 'shared', exposure: ['source-code'] };
+  original.journey[0]!.decision.contextIsolation = 'host-reported fresh'; // Cannot erase recorded contamination.
+  const report = sessionReport(original, []);
+  const md = renderMarkdown(report, '/artifacts');
+  assert.match(md, /How to interpret this test/); assert.match(md, /informed walkthroughs/); assert.match(md, /First-visit conclusions are withheld/);
+  assert.match(renderDetailedMarkdown(report, '/artifacts'), /source-code/);
+  const unknown = sessionReport(session('two'), []);
+  assert.match(renderMarkdown(unknown, '/artifacts'), /First-visit conclusions are withheld/);
+  const fresh = session('three'); fresh.journey[0]!.decision.contextIsolation = 'host-reported fresh';
+  assert(!renderMarkdown(sessionReport(fresh, []), '/artifacts').includes('First-visit conclusions are withheld'));
+});
+
+test('superseded runs keep an archive but cannot contribute outcomes or recurrence', () => {
+  const prior = sessionReport(session('prior'), [issue]); prior.supersededBy = 'replacement';
+  const replacement = sessionReport(session('replacement'), [issue]);
+  const merged = synthesizeReports([prior, replacement], 'round-current');
+  assert.equal(merged.sessions.length, 1); assert.equal(merged.findings[0]!.evidence.length, 1);
+  const md = renderMarkdown(prior, '/artifacts');
+  assert.match(md, /Superseded attempt/); assert(!md.includes('Reported completion')); assert(!md.includes('Pricing label unclear'));
+  assert.match(renderDetailedMarkdown(prior, '/artifacts'), /Pricing label unclear/);
+});

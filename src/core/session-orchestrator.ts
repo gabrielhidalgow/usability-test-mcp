@@ -38,10 +38,10 @@ class PolicyBlocked extends Error {}
 export class SessionOrchestrator {
   constructor(private readonly recorder: EvidenceRecorder, private readonly driverFactory: (input: SessionInput) => ProductDriver) {}
 
-  async run(rawInput: unknown, provider: ReasoningProvider, externalSignal?: AbortSignal, onCreated?: (id: string) => void, context?: { continuation: Continuation; priorHistory: PriorHistory[] }): Promise<RunResult> {
+  async run(rawInput: unknown, provider: ReasoningProvider, externalSignal?: AbortSignal, onCreated?: (id: string) => void | Promise<void>, context?: { continuation: Continuation; priorHistory: PriorHistory[] }): Promise<RunResult> {
     const input = sessionInputSchema.parse(rawInput);
     const { id, paths } = await this.recorder.create('session');
-    onCreated?.(id);
+    await onCreated?.(id);
     const deadline = new AbortController();
     const timer = setTimeout(() => deadline.abort(new Error('Session deadline exceeded')), input.timeoutMs);
     const windowClosed = new AbortController();

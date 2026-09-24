@@ -12,6 +12,7 @@ export const capabilitySchema = z.enum([
   'deletion', 'accountClosure', 'payment',
 ]);
 export const personaSchema = z.strictObject({
+  id: z.string().regex(/^[a-z0-9-]{1,60}$/).optional(),
   name: z.string().min(1).max(80).default('Participant'),
   context: z.string().min(1).max(2000),
   technicalConfidence: z.enum(['low', 'average', 'high']).default('average'),
@@ -22,6 +23,16 @@ export const personaSchema = z.strictObject({
 });
 export const discoveryIdSchema = z.string().regex(/^discovery-[0-9a-f-]{36}$/);
 export const handoffSchema = z.strictObject({ discoveryId: discoveryIdSchema, context: z.enum(['shared', 'host-reported fresh', 'unknown']), startingStateConfirmed: z.boolean().optional() });
+export const contextCheckSchema = z.strictObject({
+  mode: z.enum(['first-visit', 'informed-walkthrough']).default('first-visit'),
+  isolation: z.enum(['shared', 'host-reported fresh', 'unknown']),
+  exposure: z.array(z.enum(['source-code', 'discovery', 'prior-findings', 'prior-journeys'])).default([]),
+});
+export const rerunSchema = z.strictObject({
+  priorRunId: z.string().regex(/^(session|round)-[0-9a-f-]{36}$/),
+  reason: z.enum(['wrong-participant', 'policy-adjustment', 'context-contamination', 'interrupted', 'other']),
+  changes: z.string().trim().min(1).max(1000),
+});
 export const sessionBaseSchema = z.strictObject({
   target: z.string().min(1).max(4000),
   platform: z.enum(['web', 'native']).default('web'),
@@ -33,6 +44,8 @@ export const sessionBaseSchema = z.strictObject({
   timeoutMs: z.number().int().min(1000).max(600000).default(180000),
   presentation: z.enum(['visible', 'background']).optional(),
   handoff: handoffSchema.optional(),
+  contextCheck: contextCheckSchema.optional(),
+  rerun: rerunSchema.optional(),
   viewport: z.enum(['desktop', 'mobile']).default('desktop'),
   accessibilityChecks: z.boolean().default(true),
   interactionMode: z.enum(['standard', 'keyboard']).default('standard'),

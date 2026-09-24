@@ -91,7 +91,9 @@ export type UsabilityReport = {
   id: string; kind: 'session' | 'round'; synthetic: true; generatedAt: string;
   platform?: 'web' | 'native'; viewport?: 'desktop' | 'mobile'; target: string; scenario: string; goal: string; disclaimer: string;
   sessions: { id: string; persona: Persona; status: SessionStatus; reason: string;
-    continuation?: Continuation; presentation?: 'visible' | 'background'; handoff?: SessionInput['handoff']; actions: number; wrongTurns: number; backtracks: number; provider: string }[];
+    continuation?: Continuation; presentation?: 'visible' | 'background'; handoff?: SessionInput['handoff']; contextCheck?: SessionInput['contextCheck']; actions: number; wrongTurns: number; backtracks: number; provider: string }[];
+  correction?: { priorRunId: string; reason: string; changes: string; recordedAt: string; changedFields: string[] };
+  supersededBy?: string;
   comparison?: import('./comparison.js').Comparison;
   findings: UsabilityIssue[]; accessibility: (AccessibilityScan & { sessionId: string })[];
   journeys: { sessionId: string; steps: JourneyStep[] }[];

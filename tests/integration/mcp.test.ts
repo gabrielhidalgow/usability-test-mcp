@@ -34,8 +34,8 @@ test('ordinary host tool calls drive three isolated participants, return images 
     const savedProfile = textPayload(await client.callTool({ name: 'usability_save_project', arguments: {
       name: 'Ledger', target: fixture.url,
       answers: { purpose: 'Owner-only business context', audience: 'Small business owners', priority: 'Compare plans', success: 'Find price and setup', boundaries: 'No submissions' },
-      personas: [1, 2, 3].map(n => ({ name: `Visitor ${n}`, context: 'First-time visitor comparing accounting software' })),
-      journeys: [{ id: 'compare', scenario: 'Comparing accounting software', goal: 'Find the monthly price and reach workspace setup.', successCriteria: ['Monthly cost is visible', 'Workspace setup is reached'] }],
+      personas: [1, 2, 3].map(n => ({ id: `visitor-${n}`, name: `Visitor ${n}`, context: 'First-time visitor comparing accounting software' })),
+      journeys: [{ id: 'compare', personaIds: ['visitor-1', 'visitor-2', 'visitor-3'], scenario: 'Comparing accounting software', goal: 'Find the monthly price and reach workspace setup.', successCriteria: ['Monthly cost is visible', 'Workspace setup is reached'] }],
     } }));
     const runArgs = { projectId: savedProfile.profile.id, journeyId: 'compare', participantCount: 3, options: { timeoutMs: 30000 } };
     assert.equal((await client.callTool({ name: 'usability_run_project', arguments: runArgs })).isError, true);

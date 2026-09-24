@@ -15,6 +15,10 @@ const savedSchema = z.object({
 });
 export async function prepareContinuation(recorder: EvidenceRecorder, id: string, options: { timeoutMs?: number; accessibilityChecks?: boolean } = {}) {
   if (!id.startsWith('session-')) throw new ContinuationError('Select an individual session ID, not a round.');
+  try {
+    const summary = JSON.parse(await recorder.read(id, 'json'));
+    if (summary.supersededBy) throw new ContinuationError(`This run was superseded by ${summary.supersededBy}; do not continue the discarded attempt.`);
+  } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
   const previous = savedSchema.parse(JSON.parse(await recorder.read(id, 'journey')));
   if (previous.id !== id || previous.status === 'completed') throw new ContinuationError('Only interrupted or incomplete sessions can be continued.');
   if (previous.input.platform !== 'web') throw new ContinuationError('Native continuation is not supported; prepare the device and start a new labelled session.');
@@ -39,7 +43,7 @@ export async function prepareContinuation(recorder: EvidenceRecorder, id: string
     previousStatus: previous.status, browserStateRestored: false,
     uncertainAction: Boolean(latest && latest.decision.selectedAction.type !== 'finish' && !latest.after && !latest.result.blocked) };
   // Never replay an action or carry forward a consequential-action override.
-  const input = sessionInputSchema.parse({ ...previous.input, target: location, timeoutMs: options.timeoutMs ?? 600000,
+  const input = sessionInputSchema.parse({ ...previous.input, rerun: undefined, target: location, timeoutMs: options.timeoutMs ?? 600000,
     accessibilityChecks: options.accessibilityChecks ?? previous.input.accessibilityChecks,
     testEnvironment: false, allowedCapabilities: [] });
   return { input, context: { continuation, priorHistory: history } };

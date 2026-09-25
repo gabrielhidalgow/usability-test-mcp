@@ -125,7 +125,7 @@ test('principle-guided reviews: tags never count as evidence, obstacles need rec
     assert.match(details, /Content principle coverage[\s\S]*Coverage not recorded/);
     assert.match(details, /not passes/); assert.match(details, /Principles \(labels, not evidence\)/);
     assert.match(details, /Expected: I expect a pricing page → Result:/);
-    assert.match(details, /methodology 2026\.09-1/);
+    assert.match(details, /methodology \d{4}\.\d{2}-\d+/);
   } finally { await rm(f.root, { recursive: true, force: true }); }
 });
 

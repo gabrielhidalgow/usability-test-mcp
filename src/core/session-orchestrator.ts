@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { sessionInputSchema, type SessionInput } from '../config/schema.js';
+import { isInFocus, sessionInputSchema, type SessionInput } from '../config/schema.js';
 import { decisionSchema, interpretationSchema, type Action, type ActionResult, type Continuation, type PriorHistory, type Interpretation, type JourneyStep, type ProductObservation, type RunResult, type SessionRecord } from './types.js';
 import { guardAction, isContactNavigation, safeLocation } from './safety.js';
 import { sessionReport } from './synthesis.js';
@@ -83,6 +83,9 @@ export class SessionOrchestrator {
       let observation = await run(() => driver.getObservation());
       record.initialObservation = observation;
       if (observation.capture && !observation.capture.settled) record.warnings.push('Initial capture did not settle within its time budget; transient visual findings need rechecking.');
+      const tracksFocus = Boolean(input.focus?.includePaths.length);
+      let outsideStreak = 0;
+      if (tracksFocus && !isInFocus(input.focus, observation.location)) record.warnings.push(`The start page is outside the focus area "${input.focus!.name}". Check the focus start page and paths.`);
       collectPolicy();
       await this.recorder.checkpoint(record);
       await scan(observation, 0);
@@ -131,11 +134,21 @@ export class SessionOrchestrator {
         observation = await run(() => driver.getObservation());
         step.after = observation;
         if (observation.capture && !observation.capture.settled) record.warnings.push(`Capture after action ${record.actions} did not settle; transient visual findings need rechecking.`);
+        if (tracksFocus) {
+          step.focus = isInFocus(input.focus, observation.location) ? 'inside' : 'outside';
+          outsideStreak = step.focus === 'outside' ? outsideStreak + 1 : 0;
+        }
         collectPolicy();
         driver.setActionCapability(null);
         await this.recorder.checkpoint(record);
         if (step.result.blocked) {
           record.status = 'blocked'; record.reason = step.result.message; break;
+        }
+        // Leaving the focus is recorded, not prevented; a sustained exit ends the journey as its own finding.
+        if (tracksFocus && outsideStreak >= input.focus!.leaveLimit) {
+          record.status = 'incomplete'; record.focusExit = true;
+          record.reason = `Left the focus area (${outsideStreak} consecutive steps outside "${input.focus!.name}")`;
+          break;
         }
         await scan(observation, record.actions);
       }

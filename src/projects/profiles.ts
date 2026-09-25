@@ -2,18 +2,19 @@ import { mkdir, readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { discoveryIdSchema, personaSchema, sessionBaseSchema, sessionInputSchema, roundInputSchema, isHttpUrlWithoutCredentials } from '../config/schema.js';
+import { discoveryIdSchema, focusSchema, focusStartUrl, personaSchema, sessionBaseSchema, sessionInputSchema, roundInputSchema, isHttpUrlWithoutCredentials } from '../config/schema.js';
 import { EvidenceRecorder } from '../evidence/recorder.js';
 
 const answer = z.string().trim().min(1).max(2000);
 export const projectIdSchema = z.string().regex(/^project-[0-9a-f-]{36}$/);
-export const intakeSchema = z.strictObject({ purpose: answer, audience: answer, priority: answer, success: answer, boundaries: answer });
+export const intakeSchema = z.strictObject({ purpose: answer, audience: answer, priority: answer, success: answer, boundaries: answer, focus: answer.optional() });
 export const questions = {
   purpose: 'What does the product help people do?',
   audience: 'Who are its main users, what knowledge and information needs differ, and which details come from research versus assumptions?',
   priority: 'Which user outcome or journey matters most for this test?',
   success: 'What visible evidence would show that the user succeeded?',
   boundaries: 'What is safe to test, and what must be avoided? Do not include passwords or secrets.',
+  focus: 'Which feature, page or flow should this test focus on? Leave blank to test from the home page.',
 };
 export const planSchema = z.strictObject({
   name: z.string().trim().min(1).max(120),
@@ -23,8 +24,10 @@ export const planSchema = z.strictObject({
   discoveryId: discoveryIdSchema.optional(),
   answers: intakeSchema,
   personas: z.array(personaSchema).min(1).max(5),
+  focusAreas: z.array(focusSchema.required({ id: true })).max(8).optional(),
   journeys: z.array(z.strictObject({
     id: z.string().regex(/^[a-z0-9-]{1,60}$/),
+    focusAreaId: z.string().regex(/^[a-z0-9-]{1,60}$/).optional(),
     personaIds: z.array(z.string().regex(/^[a-z0-9-]{1,60}$/)).min(1).max(5).optional(),
     scenario: answer, goal: answer,
     successCriteria: z.array(answer).min(1).max(10),
@@ -33,7 +36,12 @@ export const planSchema = z.strictObject({
   const ids = p.personas.map(persona => persona.id).filter(id => id !== undefined);
   return new Set(ids).size === ids.length && p.journeys.every(j => !j.personaIds ||
     new Set(j.personaIds).size === j.personaIds.length && j.personaIds.every(id => ids.includes(id)));
-}, 'Persona IDs must be unique and journey personaIds must reference existing profiles without duplicates');
+}, 'Persona IDs must be unique and journey personaIds must reference existing profiles without duplicates').refine(p => {
+  const ids = (p.focusAreas ?? []).map(f => f.id);
+  return new Set(ids).size === ids.length && p.journeys.every(j => !j.focusAreaId || ids.includes(j.focusAreaId));
+}, 'Focus area IDs must be unique and each journey focusAreaId must reference a saved focus area').refine(
+  p => p.platform !== 'native' || (p.focusAreas ?? []).every(f => !f.startPath && !f.includePaths.length),
+  'Native focus areas can have a name and description only');
 const profileSchema = z.strictObject({ id: projectIdSchema, createdAt: z.string(), approvedAt: z.string().nullable(), plan: planSchema });
 export type ProjectProfile = z.infer<typeof profileSchema>;
 
@@ -81,8 +89,11 @@ export function projectRun(profile: ProjectProfile, journeyId: string, participa
   if (!assigned) throw new Error('This journey has no participant assignment. Save and approve a new draft with stable persona IDs and journey personaIds; no profile was chosen automatically.');
   if (participantCount > assigned.length) throw new Error('This journey needs one assigned persona per requested participant.');
   const selected = assigned.slice(0, participantCount);
-  const assignment = { journeyId, participants: selected.map(p => ({ id: p.id, name: p.name })) };
-  const task = { ...settings, ...(profile.plan.platform === 'native' ? { platform: 'native', native: profile.plan.native, testEnvironment: true, accessibilityChecks: false } : {}), target: profile.plan.target, scenario: journey.scenario, goal: journey.goal };
+  const assignment = { journeyId, focusArea: journey.focusAreaId, participants: selected.map(p => ({ id: p.id, name: p.name })) };
+  // One focus area per journey. Participants start on its page but never see its boundary.
+  const focus = journey.focusAreaId ? profile.plan.focusAreas?.find(f => f.id === journey.focusAreaId) : undefined;
+  const task = { ...settings, ...(profile.plan.platform === 'native' ? { platform: 'native', native: profile.plan.native, testEnvironment: true, accessibilityChecks: false } : {}),
+    ...(focus ? { focus } : {}), target: profile.plan.platform === 'native' ? profile.plan.target : focusStartUrl(profile.plan.target, focus), scenario: journey.scenario, goal: journey.goal };
   return participantCount === 1
     ? { kind: 'session' as const, assignment, input: sessionInputSchema.parse({ ...task, persona: selected[0] }) }
     : { kind: 'round' as const, assignment, input: roundInputSchema.parse({ ...task, participantCount, personas: selected }) };

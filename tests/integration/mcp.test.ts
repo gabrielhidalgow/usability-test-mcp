@@ -30,7 +30,7 @@ test('ordinary host tool calls drive three isolated participants, return images 
     assert.equal(health.apiKeyRequired, false);
     assert.equal(health.reasoningMode, 'connected-host-chat');
     const setup = textPayload(await client.callTool({ name: 'usability_setup_project', arguments: { answers: { purpose: 'Accounting' } } }));
-    assert.equal(setup.questions.length, 4);
+    assert.equal(setup.questions.length, 5);
     const savedProfile = textPayload(await client.callTool({ name: 'usability_save_project', arguments: {
       name: 'Ledger', target: fixture.url,
       answers: { purpose: 'Owner-only business context', audience: 'Small business owners', priority: 'Compare plans', success: 'Find price and setup', boundaries: 'No submissions' },

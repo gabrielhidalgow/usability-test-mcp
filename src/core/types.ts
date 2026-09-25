@@ -56,6 +56,8 @@ export type AccessibilityScan = { step: number; screenshot: string; findings: Ax
 export type JourneyStep = {
   step: number; before: ProductObservation; decision: ParticipantDecision;
   result: ActionResult; after?: ProductObservation;
+  /** Whether the resulting screen was inside the run's focus area (absent when no focus paths were set). */
+  focus?: 'inside' | 'outside';
 };
 export const suggestedChangeSchema = z.strictObject({
   kind: z.enum(['copy', 'design', 'interaction']),
@@ -90,14 +92,16 @@ export type SessionRecord = {
   policyDiagnostics?: (PolicyDiagnostic & { step: number })[];
   failureStage?: string;
   continuation?: Continuation;
+  focusExit?: boolean;
 };
 export type UsabilityReport = {
   id: string; kind: 'session' | 'round'; synthetic: true; generatedAt: string;
   methodologyVersion?: string; exercise?: 'task' | 'first-impression';
+  focus?: SessionInput['focus'];
   baselineComparison?: import('./run-comparison.js').BaselineComparison;
   platform?: 'web' | 'native'; viewport?: 'desktop' | 'mobile'; target: string; scenario: string; goal: string; disclaimer: string;
   sessions: { id: string; persona: Persona; status: SessionStatus; reason: string;
-    continuation?: Continuation; presentation?: 'visible' | 'background'; handoff?: SessionInput['handoff']; contextCheck?: SessionInput['contextCheck']; actions: number; wrongTurns: number; backtracks: number; provider: string }[];
+    continuation?: Continuation; presentation?: 'visible' | 'background'; handoff?: SessionInput['handoff']; contextCheck?: SessionInput['contextCheck']; focusExit?: boolean; actions: number; wrongTurns: number; backtracks: number; provider: string }[];
   correction?: { priorRunId: string; reason: string; changes: string; recordedAt: string; changedFields: string[] };
   supersededBy?: string;
   comparison?: import('./comparison.js').Comparison;

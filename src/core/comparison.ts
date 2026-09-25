@@ -85,6 +85,7 @@ export class ComparisonReviews {
     return { id, revision: report.comparison.revision, stage: report.comparison.nextStage,
       instructions: [instructions[report.comparison.nextStage], CHANGE_INSTRUCTIONS,
         ...(report.comparison.nextStage === 'ux' || report.comparison.nextStage === 'content' ? [principleChecklist(report.comparison.nextStage), REVIEW_GUARDRAILS] : []),
+        ...(report.focus ? [`This test focused on "${report.focus.name}"${report.focus.includePaths.length ? ` (${report.focus.includePaths.join(', ')})` : ''}. Steps are marked inside/outside focus. Prioritise evidence inside the focus area; outside-focus obstacles are secondary unless they explain why participants left.`] : []),
         ...(report.comparison.nextStage === 'synthesis' ? ['Principle tags on patterns are optional labels; they never change participant counts.'] : [])].join(' '), report,
       nextTool: report.comparison.nextStage === 'complete' ? 'usability_get_report' : 'usability_submit_review',
       screenshotInstructions: 'Call usability_get_review with sessionId and step to view the recorded before/after screenshots. Inspect screenshots before making visual claims.' };

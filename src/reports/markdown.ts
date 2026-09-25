@@ -3,6 +3,7 @@ import { relative } from 'node:path';
 import type { SuggestedChange, UsabilityReport } from '../core/types.js';
 import { describeAction } from '../core/action-description.js';
 import { PRINCIPLES } from '../methodology/principles.js';
+import { isOutsideFocusOnly } from './executive.js';
 
 const METHODOLOGY_DOC = 'https://github.com/gabrielhidalgow/usability-test-mcp/blob/main/docs/METHODOLOGY.md';
 function principleTags(ids: readonly string[] | undefined): string[] {
@@ -25,6 +26,7 @@ export function renderDetailedMarkdown(report: UsabilityReport, directory: strin
   const lines = ['# Usability Test — Evidence appendix', '', '[Back to executive report](report.md)', '', report.disclaimer, '', '## Test setup', '',
     `Product: ${escape(report.target)}`, '', `Platform: ${report.platform ?? 'web'}`, '', `Date: ${report.generatedAt}`, '',
     `Scenario: ${escape(report.scenario)}`, '', `Goal: ${escape(report.goal)}`, '',
+    ...(report.focus ? [`Focus area: ${escape(report.focus.name)}${report.focus.description ? ` — ${escape(report.focus.description)}` : ''}. Start page: ${escape(report.focus.startPath ?? 'product URL')}. In scope: ${report.focus.includePaths.map(escape).join(', ') || 'not tracked'}. A journey ends after ${report.focus.leaveLimit} consecutive steps outside. Participants were not told the boundary.`, ''] : []),
     '## Executive summary', '',
     `${report.sessions.length} synthetic session(s); ${report.sessions.filter(s => s.status === 'completed').length} reported completion; ${report.findings.length} evidence-linked usability finding(s).`, '',
     '## Task outcomes', '', '| Participant | Outcome | Actions | Simulated wrong turns | Backtracks |',
@@ -92,7 +94,9 @@ export function renderDetailedMarkdown(report: UsabilityReport, directory: strin
   }
   lines.push('', '## Most important findings', '');
   if (!report.findings.length) lines.push(report.comparison?.nextStage === 'participants' ? 'Participant interpretation is pending.' : 'No evidence-linked usability issues were reported. This is not evidence that the product has no issues.');
-  for (const issue of report.findings) {
+  const outside = report.findings.filter(f => isOutsideFocusOnly(report, f));
+  for (const issue of [...report.findings.filter(f => !outside.includes(f)), ...outside]) {
+    if (issue === outside[0]) lines.push('## Outside the focus area', '', 'These findings happened only on pages outside the focus area. They are secondary unless they explain why participants left the focus.', '');
     lines.push(`### ${issue.id} — ${escape(issue.title)}`, '',
       `Severity: ${issue.severity} · Task impact: ${issue.taskImpact} · Interpretation confidence: ${issue.confidence}`, '',
       `Participants affected: ${issue.participantsAffected.map(escape).join(', ')}`, '',
@@ -105,7 +109,7 @@ export function renderDetailedMarkdown(report: UsabilityReport, directory: strin
   for (const journey of report.journeys) {
     lines.push(`### ${escape(report.sessions.find(s => s.id === journey.sessionId)?.persona.name ?? journey.sessionId)}`, '');
     for (const step of journey.steps) {
-      lines.push(`- Step ${step.step}: **${escape(describeAction(step))}** — ${escape(step.result.message)}. ${link(step.before.screenshot.path)}${step.after ? ` → ${link(step.after.screenshot.path)}` : ''}`,
+      lines.push(`- Step ${step.step}${step.focus === 'outside' ? ' (outside focus)' : ''}: **${escape(describeAction(step))}** — ${escape(step.result.message)}. ${link(step.before.screenshot.path)}${step.after ? ` → ${link(step.after.screenshot.path)}` : ''}`,
         `  Simulated commentary: ${escape(step.decision.simulatedCommentary)}`);
       if (step.decision.userExpectation) lines.push(`  Expected: ${escape(step.decision.userExpectation)} → Result: ${step.after ? `${escape(step.after.title)} (${escape(step.after.location)})` : 'no resulting screen recorded'}`);
     }

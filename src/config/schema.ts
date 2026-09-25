@@ -33,6 +33,35 @@ export const rerunSchema = z.strictObject({
   reason: z.enum(['wrong-participant', 'policy-adjustment', 'context-contamination', 'interrupted', 'other']),
   changes: z.string().trim().min(1).max(1000),
 });
+// Same-origin path prefixes only: no scheme, host, query or fragment.
+// Rejecting '//' and backslashes stops protocol-relative paths from escaping the product origin.
+const focusPath = z.string().regex(/^\/(?!\/)[^?#\s\\]{0,199}$/, 'Use a same-origin path such as /checkout');
+export const focusSchema = z.strictObject({
+  id: z.string().regex(/^[a-z0-9-]{1,60}$/).optional(),
+  name: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(1000).optional(),
+  startPath: focusPath.optional(),
+  includePaths: z.array(focusPath).max(10).default([]),
+  leaveLimit: z.number().int().min(1).max(10).default(3),
+});
+export type Focus = z.infer<typeof focusSchema>;
+export function isInFocus(focus: Focus | undefined, location: string): boolean {
+  if (!focus?.includePaths.length) return true;
+  let path: string;
+  try { path = new URL(location).pathname; } catch { return false; }
+  return focus.includePaths.some(prefix => {
+    const base = prefix.replace(/\/+$/, '');
+    return base === '' || path === base || path.startsWith(`${base}/`);
+  });
+}
+/** Resolve a focus start page against the product URL; never leaves the product's origin. */
+export function focusStartUrl(target: string, focus: Focus | undefined): string {
+  if (!focus?.startPath) return target;
+  const base = new URL(target);
+  const start = new URL(focus.startPath, base);
+  if (start.origin !== base.origin) throw new Error('Focus start page must stay on the product origin.');
+  return start.href;
+}
 export const sessionBaseSchema = z.strictObject({
   target: z.string().min(1).max(4000),
   platform: z.enum(['web', 'native']).default('web'),
@@ -47,6 +76,7 @@ export const sessionBaseSchema = z.strictObject({
   contextCheck: contextCheckSchema.optional(),
   rerun: rerunSchema.optional(),
   exercise: z.enum(['task', 'first-impression']).default('task'),
+  focus: focusSchema.optional(),
   viewport: z.enum(['desktop', 'mobile']).default('desktop'),
   accessibilityChecks: z.boolean().default(true),
   interactionMode: z.enum(['standard', 'keyboard']).default('standard'),
@@ -57,6 +87,8 @@ export const sessionInputSchema = sessionBaseSchema.refine(x => x.platform === '
   ? isHttpUrlWithoutCredentials(x.target) && !x.native
   : /^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+$/.test(x.target) && Boolean(x.native) && x.testEnvironment && x.allowedCapabilities.length === 0 && !x.accessibilityChecks && x.interactionMode === 'standard',
   'Web requires an HTTP(S) URL without credentials. Native requires an app ID, a prepared test device, testEnvironment=true, no capability overrides, no axe scans and standard interaction.').refine(
+  x => x.platform === 'web' || (!x.focus?.startPath && !x.focus?.includePaths.length),
+  'Native focus areas can have a name and description only; page paths cannot be tracked in native apps.').refine(
   x => x.testEnvironment || x.allowedCapabilities.length === 0,
   'Capability overrides require testEnvironment: true',
 );

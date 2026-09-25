@@ -3,7 +3,7 @@ import type { planSchema } from './profiles.js';
 import type { Discovery } from './discovery.js';
 
 type Plan = z.infer<typeof planSchema>;
-export type TaskWarning = { journeyId?: string; field: 'scenario' | 'goal' | 'successCriteria' | 'personaIds';
+export type TaskWarning = { journeyId?: string; focusAreaId?: string; field: 'scenario' | 'goal' | 'successCriteria' | 'personaIds' | 'focusAreaId' | 'focusAreas';
   principleId: 'realistic-tasks' | 'neutral-facilitation'; issue: string; suggestion: string };
 
 const ROUTE_WORDS = /\b(click|tap|press|select|navigate|go to|open the|menu|tab|button|link|dropdown|breadcrumb|sidebar|header|footer|scroll)\b/i;
@@ -53,8 +53,20 @@ export function reviewPlanTasks(plan: Plan, discovery?: Pick<Discovery, 'observa
       if (UNSUPPORTED.test(criterion)) warnings.push({ journeyId: journey.id, field: 'successCriteria', principleId: 'realistic-tasks',
         issue: `Criterion ${i + 1} needs a PDF, download or external step the browser cannot complete.`, suggestion: 'Use a visible in-browser outcome instead, or mark it untestable.' });
     });
+    const focus = journey.focusAreaId ? plan.focusAreas?.find(f => f.id === journey.focusAreaId) : undefined;
+    if (plan.focusAreas?.length && !journey.focusAreaId) warnings.push({ journeyId: journey.id, field: 'focusAreaId', principleId: 'realistic-tasks',
+      issue: 'The plan has focus areas but this journey has none, so it will start on the home page and cover the whole site.', suggestion: 'Assign a focusAreaId, or confirm this journey is meant to be unfocused.' });
+    for (const path of focus ? [focus.startPath, ...focus.includePaths].filter((x): x is string => Boolean(x) && x !== '/') : []) {
+      for (const field of ['scenario', 'goal'] as const) if (journey[field].toLowerCase().includes(path.toLowerCase())) warnings.push({ journeyId: journey.id, focusAreaId: focus!.id, field, principleId: 'realistic-tasks',
+        issue: `Mentions the focus path "${path}". The participant already starts there; naming it gives away the route.`, suggestion: 'Describe the goal in the user’s words; the focus area controls where the test starts and what is in scope.' });
+    }
     if (plan.personas.length > 1 && !journey.personaIds) warnings.push({ journeyId: journey.id, field: 'personaIds', principleId: 'neutral-facilitation',
       issue: 'Several profiles exist but this journey does not say which ones it is for.', suggestion: 'Assign stable persona IDs so the right audience attempts this task.' });
+  }
+  for (const area of plan.focusAreas ?? []) {
+    if (plan.platform !== 'native' && !area.startPath && !area.includePaths.length) warnings.push({ focusAreaId: area.id, field: 'focusAreas', principleId: 'realistic-tasks',
+      issue: `Focus area "${area.name}" has no start page or in-scope paths, so the test cannot start there or tell when a participant leaves it.`,
+      suggestion: 'Add startPath (where the participant begins) and includePaths (page prefixes that count as inside), for example /checkout.' });
   }
   return warnings;
 }

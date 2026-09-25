@@ -2,7 +2,7 @@ import { mkdir, readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { discoveryIdSchema, sessionInputSchema, isHttpUrlWithoutCredentials, type SessionInput } from '../config/schema.js';
+import { discoveryIdSchema, focusSchema, focusStartUrl, isInFocus, sessionInputSchema, isHttpUrlWithoutCredentials, type SessionInput } from '../config/schema.js';
 import type { ProductObservation } from '../core/types.js';
 import { EvidenceRecorder } from '../evidence/recorder.js';
 import { PlaywrightProductDriver } from '../drivers/playwright/driver.js';
@@ -12,7 +12,8 @@ import { safeLocation } from '../core/safety.js';
 export const DISCOVERY_NOTICE = 'I reviewed these screens and drafted the answers below. You can edit, replace, or remove any suggestion.';
 export const TASK_LIMITS = 'PDF viewing, downloads, popups and external navigation are unsupported. Do not promise a PDF was opened. Propose a supported success criterion or explicitly mark that part untestable. Sending enquiries and submitting forms remain blocked.';
 export const discoveryInputSchema = z.discriminatedUnion('platform', [
-  z.strictObject({ platform: z.literal('web'), target: z.string().refine(isHttpUrlWithoutCredentials), viewport: z.enum(['desktop', 'mobile']).default('desktop'), presentation: z.enum(['visible', 'background']).optional() }),
+  z.strictObject({ platform: z.literal('web'), target: z.string().refine(isHttpUrlWithoutCredentials), viewport: z.enum(['desktop', 'mobile']).default('desktop'), presentation: z.enum(['visible', 'background']).optional(),
+    startPath: focusSchema.shape.startPath, includePaths: focusSchema.shape.includePaths.optional() }),
   z.strictObject({ platform: z.literal('native'), appId: z.string().regex(/^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+$/), deviceId: z.string().regex(/^[A-Za-z0-9_.:-]{1,160}$/), os: z.enum(['ios', 'android']), currentAppConfirmed: z.literal(true), preparedTestDevice: z.literal(true) }),
 ]);
 const suggestion = z.strictObject({ value: z.string().trim().min(1).max(2000), basis: z.enum(['observed', 'assumption']), sources: z.array(z.string().regex(/^screen-[1-4]$/)).min(1).max(4) });
@@ -20,7 +21,7 @@ export const suggestionsSchema = z.strictObject({ purpose: suggestion.optional()
   journeys: z.array(suggestion).max(3).default([]) });
 export type Discovery = { id: string; platform: 'web' | 'native'; target: string; createdAt: string;
   observations: { id: string; via?: string; observation: ProductObservation }[]; limitations: string[];
-  suggestions?: z.infer<typeof suggestionsSchema> };
+  suggestions?: z.infer<typeof suggestionsSchema>; focus?: { startPath?: string; includePaths: string[] } };
 export class DiscoveryError extends Error {}
 export class Discoveries {
   private recorder: EvidenceRecorder;
@@ -57,9 +58,11 @@ export class Discoveries {
     await mkdir(join(directory, 'screenshots'), { recursive: true, mode: 0o700 });
     const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 60000);
     const signal = AbortSignal.any([controller.signal, ...(externalSignal ? [externalSignal] : [])]);
-    const target = args.platform === 'web' ? args.target : args.appId;
+    // A focused scan starts on the focus page and only follows links inside the focus paths.
+    const scope = args.platform === 'web' && (args.startPath || args.includePaths?.length) ? focusSchema.parse({ name: 'Setup scan', startPath: args.startPath, includePaths: args.includePaths ?? [] }) : undefined;
+    const target = args.platform === 'web' ? focusStartUrl(args.target, scope) : args.appId;
     const record: Discovery = { id, platform: args.platform, target: args.platform === 'web' ? safeLocation(target) : target,
-      createdAt: new Date().toISOString(), observations: [], limitations: [TASK_LIMITS, 'Setup evidence only. Not a usability participant; never give these screens or suggested routes to a participant.'] };
+      createdAt: new Date().toISOString(), ...(scope ? { focus: { startPath: scope.startPath, includePaths: scope.includePaths } } : {}), observations: [], limitations: [TASK_LIMITS, 'Setup evidence only. Not a usability participant; never give these screens or suggested routes to a participant.'] };
     const input = sessionInputSchema.parse({ target, platform: args.platform, persona: { name: 'Setup discovery', context: 'Observe visible screens for editable setup suggestions.' }, scenario: 'Setup only', goal: 'Observe visible interface', accessibilityChecks: false,
       ...(args.platform === 'web' ? { viewport: args.viewport, presentation: args.presentation ?? (this.headless ? 'background' : 'visible') } : { native: { deviceId: args.deviceId, os: args.os, preparedTestDevice: true }, testEnvironment: true }) });
     const driver = args.platform === 'web' ? new PlaywrightProductDriver(this.headless) : nativeFactory();
@@ -69,7 +72,7 @@ export class Discoveries {
       else await driver.start(config);
       record.observations.push({ id: 'screen-1', observation: await driver.getObservation() });
       if (driver instanceof PlaywrightProductDriver) {
-        const links = [...new Map((await driver.visibleDiscoveryLinks()).filter(link => safeLocation(link.url) !== safeLocation(target)).map(link => [safeLocation(link.url), link])).values()].slice(0, 3);
+        const links = [...new Map((await driver.visibleDiscoveryLinks()).filter(link => safeLocation(link.url) !== safeLocation(target) && isInFocus(scope, link.url)).map(link => [safeLocation(link.url), link])).values()].slice(0, 3);
         for (const link of links) {
           if (signal.aborted) break;
           try {

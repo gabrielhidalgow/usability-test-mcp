@@ -116,6 +116,8 @@ export function mismatches(baseline: UsabilityReport, retest: UsabilityReport): 
   if (baseline.goal !== retest.goal) out.push('different goal');
   if ((baseline.platform ?? 'web') !== (retest.platform ?? 'web')) out.push('different platform');
   if (baseline.viewport !== retest.viewport) out.push(`viewport ${baseline.viewport ?? 'unknown'} vs ${retest.viewport ?? 'unknown'}`);
+  const focusKey = (r: UsabilityReport) => JSON.stringify(r.focus ? { name: r.focus.name, startPath: r.focus.startPath, includePaths: [...r.focus.includePaths].sort() } : null);
+  if (focusKey(baseline) !== focusKey(retest)) out.push(`different focus area (${baseline.focus?.name ?? 'none'} vs ${retest.focus?.name ?? 'none'})`);
   if (count(baseline) !== count(retest)) out.push(`participant count ${count(baseline)} vs ${count(retest)}`);
   else if (personaKey(baseline) !== personaKey(retest)) out.push('different participant profiles');
   return out;

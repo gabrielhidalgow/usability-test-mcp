@@ -30,9 +30,12 @@ export function renderExecutiveMarkdown(report: UsabilityReport, directory: stri
   const comparison = report.comparison;
   const pending = comparison && comparison.nextStage !== 'complete';
   const grouped = new Set(comparison?.patterns.flatMap(p => p.findingIds) ?? []);
+  const outsideOnly = new Set(report.findings.filter(f => isOutsideFocusOnly(report, f)).map(f => f.id));
+  let outsideCount = 0;
   const actions: ActionItem[] = [];
   for (const pattern of comparison?.patterns ?? []) {
     const members = report.findings.filter(f => pattern.findingIds.includes(f.id));
+    if (members.length && members.every(f => outsideOnly.has(f.id))) { outsideCount++; continue; }
     const confidence = members.some(f => f.confidence === 'low') ? 'low' : members.some(f => f.confidence === 'medium') ? 'medium' : 'high';
     const successes = pattern.assessments.filter(a => a.status === 'successful').length;
     const unclear = pattern.assessments.filter(a => a.status === 'inconclusive' || a.status === 'not-observed').length;
@@ -41,7 +44,9 @@ export function renderExecutiveMarkdown(report: UsabilityReport, directory: stri
       screenshot: members[0]?.evidence[0]?.screenshots[0], change: pattern.suggestedChange,
       counterpoint: [successes ? `${successes} successful counterexample(s)` : '', unclear ? `${unclear} not-observed/inconclusive` : ''].filter(Boolean).join('; ') });
   }
-  for (const finding of report.findings.filter(f => !grouped.has(f.id))) actions.push({
+  const ungrouped = report.findings.filter(f => !grouped.has(f.id));
+  outsideCount += ungrouped.filter(f => outsideOnly.has(f.id)).length;
+  for (const finding of ungrouped.filter(f => !outsideOnly.has(f.id))) actions.push({
     title: finding.title, why: finding.likelyUsabilityProblem, recommendation: finding.recommendation,
     severity: finding.severity, count: new Set(finding.evidence.map(e => rootId(e.sessionId))).size,
     confidence: finding.confidence, source: 'Journey evidence', screenshot: finding.evidence[0]?.screenshots[0], change: finding.suggestedChange,
@@ -75,6 +80,7 @@ export function renderExecutiveMarkdown(report: UsabilityReport, directory: stri
     `- **Method:** ${quality.some(q => q.method === 'informed walkthrough') ? 'Includes informed walkthroughs' : 'Simulated journeys'}; no real participants.${report.methodologyVersion ? ` Reviewed with methodology ${report.methodologyVersion} (Krug, Weinschenk).` : ''}`,
     `- **Context:** ${contexts} (host-reported, not independently verified).${firstVisitSupported ? '' : ' First-visit conclusions are withheld.'}`,
     `- **Coverage gaps:** ${gaps.join('; ') || 'None recorded; this does not establish complete coverage.'}`,
+    ...(report.focus ? [`- **Focus:** ${focusSummary(report)}`] : []),
     ...(report.baselineComparison ? [`- **Retest:** ${retestSummary(report.baselineComparison)}`] : []),
     `- **Corrections:** ${report.correction ? `Replaces an earlier attempt (${compact(report.correction.reason, 60)}). Earlier results are excluded; details are in the appendix.` : 'No replacement attempt recorded.'}`, '');
   lines.push('## At a glance', '',
@@ -105,6 +111,7 @@ export function renderExecutiveMarkdown(report: UsabilityReport, directory: stri
     } else lines.push(`**Change:** ${compact(action.recommendation, 220)}`, '');
     if (action.counterpoint) lines.push(`**Counterevidence:** ${action.counterpoint}. Not-observed is not proof of absence.`, '');
   });
+  if (outsideCount) lines.push(`${outsideCount} finding(s) happened only outside the focus area; they are listed separately in the [evidence appendix](details.md).`, '');
   if (distinct.length > selected.length) lines.push(`${distinct.length - selected.length} additional action(s) are in the [evidence appendix](details.md).`, '');
   const positive = comparison?.patterns.flatMap(p => p.assessments.filter(a => a.status === 'successful').map(a => ({ text: a.explanation, ref: a.evidence[0] }))) ?? [];
   if (!positive.length) for (const s of outcomes.filter(s => s.status === 'completed')) {
@@ -138,6 +145,19 @@ export function renderExecutiveMarkdown(report: UsabilityReport, directory: stri
   return lines.join('\n');
 }
 
+/** True when every evidence step of a finding landed outside the run's focus paths. */
+export function isOutsideFocusOnly(report: UsabilityReport, finding: UsabilityReport['findings'][number]): boolean {
+  if (!report.focus?.includePaths.length) return false;
+  const steps = finding.evidence.flatMap(e => e.stepNumbers.map(n => report.journeys.find(j => j.sessionId === e.sessionId)?.steps.find(s => s.step === n)));
+  return steps.length > 0 && steps.every(s => s?.focus === 'outside');
+}
+function focusSummary(report: UsabilityReport): string {
+  const focus = report.focus!;
+  const outside = report.journeys.flatMap(j => j.steps).filter(s => s.focus === 'outside').length;
+  const exits = report.sessions.filter(s => s.focusExit).length;
+  const scope = focus.includePaths.length ? ` (${compact(focus.includePaths.join(', '), 100)})` : ' (not tracked: no page paths set)';
+  return `${compact(focus.name, 80)}${scope}. ${outside} step(s) outside the focus area${exits ? `; ${exits} journey(s) ended after leaving it` : ''}. Actions below cover the focus area only.`;
+}
 function retestSummary(c: NonNullable<UsabilityReport['baselineComparison']>): string {
   const count = (outcome: string) => c.assessments.filter(a => a.outcome === outcome).length;
   return `Compared with baseline ${c.baselineId}${c.comparable ? '' : ` (not fully comparable: ${compact(c.mismatches.join('; '), 120)})`}: ${count('observed-again')} observed again, ${count('not-observed-on-comparable-path')} not observed on a comparable path, ${count('inconclusive')} inconclusive, ${c.newlyObserved.length} newly observed. Not observing a problem again is not proof it is fixed; participant counts are not merged.`;

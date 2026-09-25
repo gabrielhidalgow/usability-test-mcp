@@ -42,7 +42,7 @@ export class RunCorrections {
     if (!input.rerun) return;
     const priorId = input.rerun.priorRunId;
     const prior = JSON.parse(await this.recorder.read(priorId, 'journey'));
-    const changedFields = ['persona', 'personas', 'participantCount', 'contextCheck', 'handoff', 'viewport', 'presentation', 'allowedCapabilities', 'testEnvironment', 'maxActions', 'timeoutMs', 'accessibilityChecks', 'exercise'].filter(key => JSON.stringify(key === 'exercise' ? prior.input[key] ?? 'task' : prior.input[key]) !== JSON.stringify(input[key]));
+    const changedFields = ['persona', 'personas', 'participantCount', 'contextCheck', 'handoff', 'viewport', 'presentation', 'allowedCapabilities', 'testEnvironment', 'maxActions', 'timeoutMs', 'accessibilityChecks', 'exercise', 'focus'].filter(key => JSON.stringify(key === 'exercise' ? prior.input[key] ?? 'task' : prior.input[key]) !== JSON.stringify(input[key]));
     const correction = { ...input.rerun, recordedAt: new Date().toISOString(), changedFields };
     await this.recorder.json(join(this.recorder.paths(id).directory, 'correction.json'), correction);
     // Exclusive claim prevents two simultaneous replacements. The sidecar is durable before browser work.

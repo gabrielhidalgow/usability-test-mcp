@@ -110,6 +110,16 @@ Recommendations may include optional `suggestedChange` fields: `kind` (`copy`, `
 
 Long fields are shortened in the executive view and retained fully in the appendix. Raw participant IDs, full commentary and technical diagnostics stay in the appendix. See [the reusable report outline](docs/REPORT_TEMPLATE.md).
 
+## Focus a test on a feature or page
+
+Testing a whole website is broad. A **focus area** narrows a test to one feature, page or flow, such as checkout, account settings or the ADHD explainer pages.
+
+- **In the questionnaire:** setup asks “Which feature, page or flow should this test focus on?” Leave it blank to test from the home page. When you name one, the chat proposes `focusAreas`, each with an `id`, `name`, optional `description`, `startPath` (where the participant begins, such as `/checkout`) and `includePaths` (page prefixes that count as inside, such as `["/cart", "/checkout"]`). Each journey gets one `focusAreaId`; a plan can hold up to eight areas. The setup scan (`scan.startPath` / `scan.includePaths`) then captures only the focused pages.
+- **In a quick test:** pass `focus: { name, startPath, includePaths }` to `usability_quick_test`, e.g. *“Quickly test the checkout on https://shop.example, starting at /cart; only /cart and /checkout pages are in scope.”*
+- **During the run:** the participant starts on the focus page and is **never told the boundary**. Each step is marked inside or outside. Short detours are fine. After **3 consecutive steps outside** (change with `leaveLimit`), the journey ends as “left the focus area”, which is itself a finding about the feature.
+- **In the report:** a **Focus** line shows the area, its paths and how many steps left it. The top three actions cover the focus area only; findings that happened entirely outside it are listed in a separate appendix section. Retests with a different focus are flagged as not comparable.
+- **Limits:** paths must be same-origin prefixes (no other domains, query strings or `//`). Native apps accept a focus name and description only, because page paths can’t be tracked there. Features that live inside a single URL (modals, tabs) can be described but not tracked by path.
+
 ## Methodology: Krug and Weinschenk, applied
 
 Tests follow a small, versioned methodology adapted from Steve Krug (*Don’t Make Me Think*, *Rocket Surgery Made Easy*) and Susan Weinschenk (*100 Things Every Designer Needs to Know About People*). See [docs/METHODOLOGY.md](docs/METHODOLOGY.md) for every principle, its source, what evidence it needs and its limits. In practice:

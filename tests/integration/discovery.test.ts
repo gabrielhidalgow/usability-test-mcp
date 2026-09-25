@@ -35,7 +35,7 @@ test('discovery prefills are sourced and editable; clean handoff survives restar
     await call('usability_save_setup_suggestions',{discoveryId,suggestions:{purpose:suggestion,audience:{...suggestion,value:'First-time team owner'},success:{...suggestion,value:'Visible information found'},journeys:[{...suggestion,value:'Explore the product category'}]}});
     setup=await call('usability_setup_project',{discoveryId,answers:{purpose:'Owner purpose'}});
     assert.equal(setup.prefilledAnswers.purpose,'Owner purpose');assert.equal(setup.prefilledAnswers.audience,'First-time team owner');assert.match(setup.notice,/edit, replace, or remove/);
-    assert.deepEqual(setup.questions.map((q:{field:string})=>q.field),['priority','boundaries']);
+    assert.deepEqual(setup.questions.map((q:{field:string})=>q.field),['priority','boundaries','focus']);
     const saved=await call('usability_save_project',{name:'Fixture',target:site.url,discoveryId,answers:{...setup.prefilledAnswers,priority:'OWNER_ONLY',boundaries:'Read only'},personas:[{context:'First-time visitor'}],journeys:[{id:'explore',scenario:'You are considering a team product',goal:'Find product information',successCriteria:['PRIVATE_EVALUATOR_CRITERION']}]});
     const projectId=saved.profile.id;
     const approved=await call('usability_approve_project',{projectId,ownerApproved:true});assert.match(approved.handoff.prompt,/fresh/);

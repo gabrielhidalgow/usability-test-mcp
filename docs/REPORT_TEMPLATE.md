@@ -10,6 +10,7 @@ Synthetic participants, not human research. Reported completion and findings are
 - **Method:** [Simulated journeys or informed walkthroughs; no real participants.]
 - **Context:** [Fresh / shared / unknown; host-reported, not independently verified. Withhold first-visit conclusions for contaminated or unknown contexts.]
 - **Coverage gaps:** [Incomplete journeys and unsupported or blocked parts of the task.]
+- **Focus:** [Focus area and in-scope pages; steps outside it; whether a journey ended after leaving it. Actions cover the focus area only.]
 - **Corrections:** [Any superseded attempt; detailed reasons and changes belong in the appendix.]
 
 A superseded report contains only an archive notice and evidence link in place of current outcomes or recommendations. Never pool superseded attempts with replacements.

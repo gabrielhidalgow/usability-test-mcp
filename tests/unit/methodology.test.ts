@@ -13,6 +13,8 @@ test('methodology principles are unique, sourced, bounded and never numeric thre
     assert(!/\b\d+\s*(±|\+\/-|items|options|seconds|chunks)/i.test(p.lookFor), `${p.id} lookFor must not set numeric thresholds`);
   }
   for (const source of ['krug-dmmt', 'krug-rsme', 'weinschenk']) assert(PRINCIPLES.some(p => p.source === source));
+  for (const p of PRINCIPLES.filter(p => p.source === 'weinschenk')) assert.match((p as { verification?: string }).verification ?? '', /checked against|outline only|verified/i, `${p.id} must say how its Weinschenk attribution was checked`);
+  assert(PRINCIPLES.some(p => p.id === 'progressive-disclosure') && PRINCIPLES.some(p => p.id === 'motion-distraction'));
   assert(principleIdsSchema.safeParse(['orientation', 'feedback']).success);
   assert(!principleIdsSchema.safeParse(['invented-principle']).success);
   assert(!principleIdsSchema.safeParse(['orientation', 'feedback', 'grouping', 'goodwill', 'self-evident']).success, 'at most four tags');

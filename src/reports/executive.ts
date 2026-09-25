@@ -18,6 +18,7 @@ export function renderExecutiveMarkdown(report: UsabilityReport, directory: stri
     '**Excluded from current participant counts, completion summaries and recurring patterns.** Do not combine this attempt with its replacement. The replacement may still be incomplete.', '',
     '[Archived evidence and correction details](details.md) · [Structured report](report.json)', '',
   ].join('\n');
+  if (report.exercise === 'first-impression') return renderFirstImpression(report, directory);
   const screenshot = (path: string) => `[Screenshot](${relative(directory, path).split('/').map(encodeURIComponent).join('/')})`;
   const rootId = (id: string) => report.sessions.find(s => s.id === id)?.continuation?.rootSessionId ?? id;
   const participants = new Map<string, (typeof report.sessions)[number]>();
@@ -58,7 +59,8 @@ export function renderExecutiveMarkdown(report: UsabilityReport, directory: stri
     const key = `${a.title} ${a.change ? JSON.stringify(a.change) : a.recommendation}`.toLowerCase().replace(/\s+/g, ' ').trim();
     if (seen.has(key)) return false; seen.add(key); return true;
   });
-  const selected = distinct.slice(0, 5);
+  // Krug's observers list the three most serious problems; more belongs in the appendix.
+  const selected = distinct.slice(0, 3);
   const lines = ['# Usability Test — Executive report', '',
     `**Task:** ${compact(report.goal, 220)}`, '',
     `**Product:** ${compact(report.target, 160)} · **Date:** ${report.generatedAt.slice(0, 10)} · **Scope:** ${report.platform === 'native' ? 'native app (experimental)' : report.viewport === 'mobile' ? 'mobile web' : report.viewport === 'desktop' ? 'desktop web' : 'web (device unspecified)'} · ${outcomes.length} synthetic participant(s).`, '',
@@ -70,9 +72,10 @@ export function renderExecutiveMarkdown(report: UsabilityReport, directory: stri
     report.policyDiagnostics?.length ? `${report.policyDiagnostics.length} browser restriction(s)` : '',
     /\b(pdf|download|data\s?sheet)\b/i.test(`${report.goal} ${report.scenario}`) ? 'PDF/download completion is unsupported' : ''].filter(Boolean);
   lines.push('## How to interpret this test', '',
-    `- **Method:** ${quality.some(q => q.method === 'informed walkthrough') ? 'Includes informed walkthroughs' : 'Simulated journeys'}; no real participants.`,
+    `- **Method:** ${quality.some(q => q.method === 'informed walkthrough') ? 'Includes informed walkthroughs' : 'Simulated journeys'}; no real participants.${report.methodologyVersion ? ` Reviewed with methodology ${report.methodologyVersion} (Krug, Weinschenk).` : ''}`,
     `- **Context:** ${contexts} (host-reported, not independently verified).${firstVisitSupported ? '' : ' First-visit conclusions are withheld.'}`,
     `- **Coverage gaps:** ${gaps.join('; ') || 'None recorded; this does not establish complete coverage.'}`,
+    ...(report.baselineComparison ? [`- **Retest:** ${retestSummary(report.baselineComparison)}`] : []),
     `- **Corrections:** ${report.correction ? `Replaces an earlier attempt (${compact(report.correction.reason, 60)}). Earlier results are excluded; details are in the appendix.` : 'No replacement attempt recorded.'}`, '');
   lines.push('## At a glance', '',
     `**Outcome:** Reported completion in ${completed} of ${outcomes.length} simulated journeys.${completed < outcomes.length ? ' Other journeys remain incomplete or inconclusive; see outcomes below.' : ''}`, '');
@@ -88,7 +91,7 @@ export function renderExecutiveMarkdown(report: UsabilityReport, directory: stri
   outcomes.slice(0, 5).forEach((s, i) => lines.push(`| P${i + 1} — ${compact(s.persona.name, 45)} | ${s.status} | ${compact(s.reason, 100)} |`));
   if (outcomes.length > 5) lines.push('', 'Additional participants are in the evidence appendix.');
   if (report.sessions.some(s => s.continuation)) lines.push('', 'A continuation has a reset browser and is not an independent participant. Each participant is counted once; the latest recorded segment supplies its outcome.');
-  lines.push('', '## Recommended actions', '');
+  lines.push('', '## Recommended actions', '', 'Up to three, most serious first. Prefer the smallest change that removes the obstacle.', '');
   if (!selected.length) lines.push(pending ? 'Actions are pending evidence review.' : 'No supported action points were submitted. Validate the task with real users before drawing a broader conclusion.', '');
   selected.forEach((action, index) => {
     const priority = action.severity === 'critical' || action.severity === 'high' ? 'Fix first' : action.severity === 'medium' ? 'Next' : action.severity === 'review' ? 'Review suggestion' : 'Consider';
@@ -132,5 +135,33 @@ export function renderExecutiveMarkdown(report: UsabilityReport, directory: stri
   lines.push('**Next check:** Retest the same task and profiles after changes; compare evidence, including successful paths. Validate important findings with real users. Proposed wording and design changes are hypotheses, not proven improvements.', '',
     '[Full evidence, journeys, UX/content reviews and limitations](details.md) · [Structured report](report.json)', '',
     'Long fields may be shortened with “…”; the appendix retains complete wording.', '');
+  return lines.join('\n');
+}
+
+function retestSummary(c: NonNullable<UsabilityReport['baselineComparison']>): string {
+  const count = (outcome: string) => c.assessments.filter(a => a.outcome === outcome).length;
+  return `Compared with baseline ${c.baselineId}${c.comparable ? '' : ` (not fully comparable: ${compact(c.mismatches.join('; '), 120)})`}: ${count('observed-again')} observed again, ${count('not-observed-on-comparable-path')} not observed on a comparable path, ${count('inconclusive')} inconclusive, ${c.newlyObserved.length} newly observed. Not observing a problem again is not proof it is fixed; participant counts are not merged.`;
+}
+function renderFirstImpression(report: UsabilityReport, directory: string): string {
+  const screenshot = (path: string) => `[Screenshot](${relative(directory, path).split('/').map(encodeURIComponent).join('/')})`;
+  const session = report.sessions[0];
+  const steps = report.journeys[0]?.steps ?? [];
+  const final = steps.findLast(step => step.decision.selectedAction.type === 'finish');
+  const description = final?.decision.selectedAction.type === 'finish' ? final.decision.selectedAction.visibleEvidence : '';
+  const lines = ['# Usability Test — First-impression exercise', '',
+    `**Product:** ${compact(report.target, 160)} · **Date:** ${report.generatedAt.slice(0, 10)} · **Audience:** ${compact(session?.persona.context ?? 'unspecified', 120)}`, '',
+    '**First-impression exercise — not a task outcome.** A synthetic participant looked at the starting screen (scrolling only) and described what it communicates. It is reported separately and never pooled with task journeys.', ''];
+  if (report.sessions.some(s => s.provider.includes('test-double'))) lines.push('**DEMO / TEST DOUBLE — fixture verification, not AI usability research.**', '');
+  lines.push('## What the starting screen communicated', '');
+  if (description.trim()) lines.push(compact(description, 600), '');
+  else lines.push(`No description was recorded (${compact(session?.status ?? 'unknown', 40)}: ${compact(session?.reason ?? '', 120)}).`, '');
+  for (const step of steps.slice(0, 3)) if (step.decision.simulatedCommentary.trim()) lines.push(`- Simulated commentary: ${compact(step.decision.simulatedCommentary, 220)} ${screenshot(step.before.screenshot.path)}`);
+  if (report.findings.length) {
+    lines.push('', '## Possible clarity issues', '');
+    for (const finding of report.findings.slice(0, 3)) lines.push(`- **${compact(finding.title, 80)}** — ${compact(finding.recommendation, 180)}`);
+  }
+  lines.push('', '## How to use this', '',
+    'Compare the description with what the product intends to communicate. Mismatches are hypotheses to check with real people. This chat has now seen the product: run task tests in a fresh chat.', '',
+    '[Full evidence and limitations](details.md) · [Structured report](report.json)', '');
   return lines.join('\n');
 }

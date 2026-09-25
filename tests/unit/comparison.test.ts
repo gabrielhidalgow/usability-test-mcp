@@ -84,3 +84,61 @@ test('continuation roots count once and unknown profile/isolation remain explici
     assert.equal(review.report.comparison.patterns[0]!.participantCount, 1);
   } finally { await rm(f.root, { recursive: true, force: true }); }
 });
+
+test('principle-guided reviews: tags never count as evidence, obstacles need recorded friction, coverage needs evidence', async () => {
+  const f = await setup();
+  try {
+    // Participant 1 hesitated at step 1; participant 2 progressed on the same screen.
+    f.report.journeys[0]!.steps[0]!.decision.behavior = 'hesitation';
+    f.report.journeys[0]!.steps[0]!.decision.userExpectation = 'I expect a pricing page';
+    await f.recorder.finish(f.report);
+    const bad = await f.reviews.submit(f.id, 0, { stage: 'participants', sessions: f.sessions.map(s => ({ sessionId: s.id, findings: [{ ...issue, principleIds: ['made-up'] }] })) }).catch(e => e);
+    assert(bad instanceof Error, 'unknown principle IDs are rejected');
+    let review = await f.reviews.get(f.id);
+    assert.doesNotMatch(review.instructions, /Methodology 2026/, 'participant-stage instructions carry no reviewer checklist');
+    assert.match(review.instructions, /userExpectation/);
+    review = await f.reviews.submit(f.id, 0, { stage: 'participants', sessions: f.sessions.map((s, i) => ({ sessionId: s.id, findings: i === 0 ? [{ ...issue, principleIds: ['mindless-choices'] }] : [] })) });
+    assert.deepEqual(review.report.findings[0]!.principleIds, ['mindless-choices']);
+    review = await f.reviews.submit(f.id, 1, { stage: 'synthesis', patterns: [{ title: 'Ambiguous label', screenOrControl: 'Home Options', obstacle: 'Label', recommendation: 'Clarify',
+      principleIds: ['mindless-choices', 'conventions-language', 'self-evident', 'goodwill'], findingIds: review.report.findings.map(x => x.id),
+      assessments: f.sessions.map((s, i) => ({ participantId: s.id, status: i === 0 ? 'experienced' : i === 1 ? 'successful' : 'inconclusive', explanation: 'Fixture', evidence: i < 2 ? [{ sessionId: s.id, step: 1 }] : [] })) }] });
+    assert.equal(review.report.comparison.patterns[0]!.participantCount, 1, 'principle tags do not increase recurrence');
+    assert.match(review.instructions, /expectation-match/, 'UX stage includes the methodology checklist');
+    assert.match(review.instructions, /Do not invent emotions/);
+    const note = { title: 'Label hesitation', observation: 'Participant paused', recommendation: 'Rename', basis: 'recorded-obstacle' };
+    await assert.rejects(f.reviews.submit(f.id, 2, { stage: 'ux', notes: [{ ...note, evidence: [{ sessionId: f.sessions[1]!.id, step: 1 }] }] }), /recorded friction/);
+    await assert.rejects(f.reviews.submit(f.id, 2, { stage: 'ux', notes: [], coverage: [{ principleId: 'orientation', status: 'assessed' }] }), /requires step evidence/);
+    await assert.rejects(f.reviews.submit(f.id, 2, { stage: 'ux', notes: [], coverage: [{ principleId: 'feedback', status: 'inconclusive' }, { principleId: 'feedback', status: 'not-applicable' }] }), /at most once/);
+    await assert.rejects(f.reviews.submit(f.id, 2, { stage: 'ux', notes: [], coverage: [{ principleId: 'orientation', status: 'assessed', evidence: [{ sessionId: f.sessions[0]!.id, step: 2 }] }] }), /existing successful/);
+    // The same screen can be assessed differently depending on the evidence available for each principle.
+    review = await f.reviews.submit(f.id, 2, { stage: 'ux', notes: [{ ...note, principleIds: ['self-evident'], evidence: [{ sessionId: f.sessions[0]!.id, step: 1 }] },
+      { title: 'Possible grouping risk', observation: 'Options sits apart from the pitch', recommendation: 'Group', evidence: [{ sessionId: f.sessions[1]!.id, step: 1 }] }],
+      coverage: [{ principleId: 'orientation', status: 'assessed', note: 'Recovered easily', evidence: [{ sessionId: f.sessions[1]!.id, step: 1 }] },
+        { principleId: 'expectation-match', status: 'inconclusive', note: 'Only one expectation recorded' }, { principleId: 'error-recovery', status: 'not-encountered' }] });
+    assert.equal(review.report.comparison.reviews.ux.notes[1]!.basis, 'expert-risk');
+    review = await f.reviews.submit(f.id, 3, { stage: 'content', notes: [] });
+    assert.equal(review.stage, 'complete');
+    assert.equal(review.report.findings.length, 1, 'expert notes never add participant findings');
+    const details = await f.recorder.read(f.id, 'details');
+    assert.match(details, /Basis: recorded obstacle/); assert.match(details, /Basis: expert-identified risk/);
+    assert.match(details, /UX principle coverage/); assert.match(details, /\| orientation \| assessed/);
+    assert.match(details, /Content principle coverage[\s\S]*Coverage not recorded/);
+    assert.match(details, /not passes/); assert.match(details, /Principles \(labels, not evidence\)/);
+    assert.match(details, /Expected: I expect a pricing page → Result:/);
+    assert.match(details, /methodology 2026\.09-1/);
+  } finally { await rm(f.root, { recursive: true, force: true }); }
+});
+
+test('legacy reports without methodology or coverage stay readable', async () => {
+  const f = await setup();
+  try {
+    const legacy = structuredClone(f.report) as typeof f.report & { methodologyVersion?: string };
+    delete legacy.methodologyVersion;
+    legacy.comparison!.nextStage = 'complete';
+    legacy.comparison!.reviews.ux = { status: 'complete', notes: [{ title: 'Old note', observation: 'x', recommendation: 'y', evidence: [{ sessionId: f.sessions[0]!.id, step: 1 }] } as never] };
+    await f.recorder.finish(legacy);
+    const details = await f.recorder.read(f.id, 'details');
+    assert.match(details, /Methodology: not recorded/); assert.match(details, /Coverage not recorded/);
+    assert.match(await f.recorder.read(f.id, 'markdown'), /Executive report/);
+  } finally { await rm(f.root, { recursive: true, force: true }); }
+});

@@ -1,6 +1,6 @@
 {
   "name": "usability-test-mcp",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "private": true,
   "description": "Local-first synthetic usability testing over MCP",
   "type": "module",
@@ -39,6 +39,7 @@
     "bin/",
     "dist/src/**/*.js",
     "README.md",
-    "docs/REPORT_TEMPLATE.md"
+    "docs/REPORT_TEMPLATE.md",
+    "docs/METHODOLOGY.md"
   ]
 }

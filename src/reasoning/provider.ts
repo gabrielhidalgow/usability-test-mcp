@@ -7,6 +7,7 @@ export type ParticipantDecisionInput = {
   presentation?: 'visible' | 'background';
   continuation?: Continuation; priorHistory?: PriorHistory[];
   persona: Persona; scenario: string; goal: string; interactionMode: 'standard' | 'keyboard';
+  exercise?: 'task' | 'first-impression';
   observation: ProductObservation; history: JourneyStep[]; signal: AbortSignal;
 };
 export interface ReasoningProvider {

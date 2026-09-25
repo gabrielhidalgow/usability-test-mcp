@@ -1,6 +1,7 @@
 import type { Interpretation, SessionRecord, UsabilityIssue, UsabilityReport } from './types.js';
 import { isGroundedChange } from './suggested-change.js';
 import { describeAction } from './action-description.js';
+import { METHODOLOGY_VERSION } from '../methodology/principles.js';
 
 export const DISCLAIMER = 'These findings come from synthetic participants. Simulated commentary is not real-user evidence, and this does not replace research with real people.';
 const rank = { critical: 0, high: 1, medium: 2, low: 3 } as const;
@@ -26,6 +27,7 @@ export function sessionReport(session: SessionRecord, interpretations: Interpret
   return {
     id: session.id, kind: 'session', synthetic: true, generatedAt: new Date().toISOString(),
     platform: session.input.platform, viewport: session.input.platform === 'web' ? session.input.viewport : undefined, target: session.input.target, scenario: session.input.scenario, goal: session.input.goal, disclaimer: DISCLAIMER,
+    methodologyVersion: METHODOLOGY_VERSION, exercise: session.input.exercise ?? 'task',
     sessions: [{ id: session.id, continuation: session.continuation, presentation: session.input.presentation, handoff: session.input.handoff, contextCheck: session.input.contextCheck, persona: session.input.persona, status: session.status, reason: session.reason,
       actions: session.actions, wrongTurns: session.journey.filter(s => s.decision.behavior === 'wrong-turn').length,
       backtracks: session.journey.filter(s => s.decision.selectedAction.type === 'back').length, provider: session.provider }],
@@ -48,6 +50,7 @@ function clusterKey(issue: UsabilityIssue): string {
 }
 export function synthesizeReports(reports: UsabilityReport[], id: string): UsabilityReport {
   reports = reports.filter(report => !report.supersededBy);
+  if (reports.some(report => report.exercise === 'first-impression')) throw new Error('First-impression exercises are reported separately and cannot be pooled with task journeys.');
   const first = reports[0];
   if (!first) throw new Error('A round requires at least one report');
   const clusters = new Map<string, UsabilityIssue>();

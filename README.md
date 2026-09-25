@@ -99,7 +99,7 @@ Comparison mode supports desktop and mobile web. Native rounds remain unsupporte
 Every new test writes **`report.md`** as a short decision-making report and **`details.md`** as the full evidence appendix. The executive template contains:
 
 1. **At a glance:** task, scope, reported completion and a compact participant outcome table.
-2. **Recommended actions:** at most five prioritised fixes, with why they matter and screenshot evidence. Journey findings take priority over separate expert suggestions.
+2. **Recommended actions:** at most three prioritised fixes (Krug’s observers list the three most serious problems), with why they matter and screenshot evidence. Journey findings take priority over separate expert suggestions.
 3. **Concrete changes:** the screen/control, proposed copy/design/interaction change, and an observable retest check. Copy changes can show current → proposed wording; current wording must occur in the cited visible text. Suggested wording is not a verified product promise.
 4. **What worked:** up to two supported successes to preserve, including counterexamples to a problem.
 5. **Evidence limits and next check:** incomplete reviews, affected captures or policy restrictions, accessibility coverage, and a clear retest recommendation.
@@ -109,6 +109,19 @@ Read it with `usability_get_report` using `format: "markdown"`. Use `format: "de
 Recommendations may include optional `suggestedChange` fields: `kind` (`copy`, `design`, `interaction`), `location`, `proposal`, `verify`, and optional `replacement: { before, after }`. Do not fabricate exact current copy, implementation effort, owners, prices, clinical claims or promised outcomes. Hosts are instructed to propose specific changes, not generic advice. If no supported change exists, the report says so instead of manufacturing an action list.
 
 Long fields are shortened in the executive view and retained fully in the appendix. Raw participant IDs, full commentary and technical diagnostics stay in the appendix. See [the reusable report outline](docs/REPORT_TEMPLATE.md).
+
+## Methodology: Krug and Weinschenk, applied
+
+Tests follow a small, versioned methodology adapted from Steve Krug (*Don’t Make Me Think*, *Rocket Surgery Made Easy*) and Susan Weinschenk (*100 Things Every Designer Needs to Know About People*). See [docs/METHODOLOGY.md](docs/METHODOLOGY.md) for every principle, its source, what evidence it needs and its limits. In practice:
+
+- **Before the test:** saving a plan returns an advisory `taskReview`. It flags task wording that gives away the route (clicks, menus, URLs, quoted on-screen labels, step sequences), unobservable success criteria, PDF/download tasks and missing motivation. Nothing is rewritten; the owner decides.
+- **During the test:** participants think aloud in the first person and state what they expect each action to do. They still receive only their profile, task, current screen and own history.
+- **First impressions (optional):** the `first-impression` prompt runs Krug’s home-page tour. The participant may only scroll and describe what the product seems to be. It is reported separately and never counted as a task outcome.
+- **After the test:** UX and content reviews use principle checklists. Notes are marked as a recorded obstacle (the participant struggled) or an expert risk. Coverage records each principle as assessed, not encountered, inconclusive or not applicable; missing evidence is never a pass. Optional `principleIds` tags are labels, never evidence.
+- **Reports:** at most three actions, most serious first. The appendix shows *Expected → Result* for each step, principle coverage and the methodology version.
+- **Retesting after changes:** rerun the same task in a fresh chat, then call `usability_compare_runs` and `usability_submit_run_comparison`. Each baseline finding is marked observed again, not observed on a comparable path, or inconclusive. Different devices, profiles or tasks are flagged as not comparable. Absence is never reported as a proven fix, and participant counts are never merged. A `rerun` correction is not a retest.
+
+The principles make the method disciplined and explainable. They do not make an AI reproduce human perception, and three synthetic profiles are not three real users.
 
 ## Continue an interrupted web test
 
@@ -266,6 +279,8 @@ For a keyboard journey, ask for `usability_run_accessibility` with the same pers
 | `usability_get_review` | Read the next saved review stage or inspect evidence screenshots |
 | `usability_submit_review` | Validate and save participant interpretations, patterns, UX or content reviews |
 | `usability_get_report` | Read JSON, Markdown, or journey by session/round ID |
+| `usability_compare_runs` | Prepare a baseline → retest comparison of two saved runs of the same task |
+| `usability_submit_run_comparison` | Save validated observed-again / not-observed-on-comparable-path / inconclusive assessments |
 
 `examples/session.json` is a complete session input. The authoritative Zod schema is `src/config/schema.ts`; MCP `tools/list` publishes its JSON Schema. Unknown fields are rejected.
 
@@ -290,7 +305,9 @@ usability://rounds/<round-id>/journey
 usability://rounds/<round-id>/accessibility
 ```
 
-Prompts: `run-usability-test` and `retest-after-fixes`. The retest prompt tells the host to reuse the saved inputs without giving prior findings to participants and compare evidence afterward. Automatic comparison classification is not implemented yet.
+Prompts: `run-usability-test`, `retest-after-fixes` and `first-impression`. The retest prompt reruns the same task in a fresh context, then uses `usability_compare_runs`. The first-impression prompt runs a scroll-only home-page tour that is reported separately.
+
+The resource `usability://methodology` returns the versioned review principles for facilitators and reviewers (never participants).
 
 ## Evidence and interpretation
 

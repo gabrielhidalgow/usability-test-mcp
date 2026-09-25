@@ -5,33 +5,45 @@ import { EvidenceRecorder, artifactIdSchema } from '../evidence/recorder.js';
 import { suggestedChangeSchema, interpretationSchema, type UsabilityReport, type SessionRecord } from './types.js';
 import { isGroundedChange, CHANGE_INSTRUCTIONS } from './suggested-change.js';
 import { sessionReport } from './synthesis.js';
+import { principleChecklist, principleIdSchema, principleIdsSchema, REVIEW_GUARDRAILS } from '../methodology/principles.js';
 
 const text = z.string().trim().min(1).max(2000);
 const reference = z.strictObject({ sessionId: artifactIdSchema, step: z.number().int().positive() });
 const assessment = z.strictObject({ participantId: artifactIdSchema,
   status: z.enum(['experienced', 'successful', 'not-observed', 'inconclusive']),
   explanation: text, evidence: z.array(reference).max(20) });
-const pattern = z.strictObject({ suggestedChange: suggestedChangeSchema.optional(), title: text, screenOrControl: text, obstacle: text,
+const pattern = z.strictObject({ suggestedChange: suggestedChangeSchema.optional(), principleIds: principleIdsSchema.optional(), title: text, screenOrControl: text, obstacle: text,
   findingIds: z.array(z.string().min(1)).min(1).max(40), recommendation: text,
   assessments: z.array(assessment).min(1).max(5) });
-const expertNote = z.strictObject({ suggestedChange: suggestedChangeSchema.optional(), title: text, observation: text, recommendation: text,
+const expertNote = z.strictObject({ suggestedChange: suggestedChangeSchema.optional(), principleIds: principleIdsSchema.optional(),
+  // A recorded obstacle is something the participant actually struggled with; an expert risk is the reviewer's judgement.
+  basis: z.enum(['recorded-obstacle', 'expert-risk']).default('expert-risk'),
+  title: text, observation: text, recommendation: text,
   evidence: z.array(reference).min(1).max(20) });
+const coverageEntry = z.strictObject({ principleId: principleIdSchema,
+  status: z.enum(['assessed', 'not-encountered', 'inconclusive', 'not-applicable']),
+  note: z.string().trim().max(500).optional(), evidence: z.array(reference).max(10).default([]) });
+const expertStage = { notes: z.array(expertNote).max(8), coverage: z.array(coverageEntry).max(20).default([]) };
 export const reviewSubmissionSchema = z.discriminatedUnion('stage', [
   z.strictObject({ stage: z.literal('participants'), sessions: z.array(z.strictObject({
     sessionId: artifactIdSchema, findings: z.array(interpretationSchema).max(8),
   })).min(1).max(5) }),
   z.strictObject({ stage: z.literal('synthesis'), patterns: z.array(pattern).max(40) }),
-  z.strictObject({ stage: z.literal('ux'), notes: z.array(expertNote).max(8) }),
-  z.strictObject({ stage: z.literal('content'), notes: z.array(expertNote).max(8) }),
+  z.strictObject({ stage: z.literal('ux'), ...expertStage }),
+  z.strictObject({ stage: z.literal('content'), ...expertStage }),
 ]);
+export type CoverageEntry = z.infer<typeof coverageEntry>;
+export type ExpertNote = z.infer<typeof expertNote>;
+// coverage is absent on reviews saved before methodology 2026.09-1.
+type ExpertReview = { status: 'pending' | 'complete'; notes: ExpertNote[]; coverage?: CoverageEntry[] };
+export const reviewReference = reference;
 type Pattern = z.infer<typeof pattern> & { id: string; participantCount: number; severity: string };
 export type Comparison = {
   revision: number; nextStage: 'participants' | 'synthesis' | 'ux' | 'content' | 'complete';
   participants: { participantId: string; sessionIds: string[]; name: string;
     basis: string; contextIsolation: 'shared' | 'host-reported fresh' | 'unknown' }[];
   patterns: Pattern[]; ungroupedFindingIds: string[];
-  reviews: { ux: { status: 'pending' | 'complete'; notes: z.infer<typeof expertNote>[] };
-    content: { status: 'pending' | 'complete'; notes: z.infer<typeof expertNote>[] } };
+  reviews: { ux: ExpertReview; content: ExpertReview };
   lastSubmission?: string;
 };
 export function initializeComparison(report: UsabilityReport): Comparison {
@@ -53,10 +65,10 @@ export function initializeComparison(report: UsabilityReport): Comparison {
 }
 export class ReviewError extends Error {}
 const instructions = {
-  participants: 'All journeys are finished. Interpret each participant independently from recorded evidence. Submit one entry per session, including empty findings. Cite only successful, nonblocked steps. Tool errors, action limits and safety blocks are not product issues. Do not infer emotions or disabilities. Existing individual findings will be preserved.',
+  participants: 'All journeys are finished. Interpret each participant independently from recorded evidence. Compare each recorded userExpectation with the resulting screen; mismatches are evidence. Submit one entry per session, including empty findings. Cite only successful, nonblocked steps. Tool errors, action limits and safety blocks are not product issues. Do not infer emotions or disabilities. Existing individual findings will be preserved.',
   synthesis: 'Group findings only when the visible screen/control, obstacle and task impact describe the same issue. Titles need not match. Include one assessment per stable participant ID: experienced, successful on the relevant interface, not-observed, or inconclusive. Cite evidence for experienced/successful. Not-observed is not proof of absence. Retain contradictory evidence. Do not merge unrelated obstacles or force consensus; omit doubtful groups to keep their findings ungrouped. No percentages or statistical claims.',
-  ux: 'Act as a post-run UX reviewer. Inspect saved screenshots and journeys. Submit evidence-linked UX recommendations, including successful patterns worth preserving. These are expert interpretations, not additional participant observations. Empty notes are valid. Do not infer human emotions, timing, or outcomes from tool failures.',
-  content: 'Act as a separate post-run content reviewer. Inspect visible wording and recorded journeys for terminology, clarity, information gaps and helpful content. Cite screenshot/step evidence. Do not invent missing content, emotions or domain facts. These are expert interpretations, not participant observations. Empty notes are valid.',
+  ux: 'Act as a post-run UX reviewer. Inspect saved screenshots and journeys. Submit evidence-linked UX recommendations, including successful patterns worth preserving. These are expert interpretations, not additional participant observations. Empty notes are valid. Do not infer human emotions, timing, or outcomes from tool failures. Mark each note basis: recorded-obstacle only when the cited step shows friction or non-progress behaviour, otherwise expert-risk. Submit coverage for the listed principles: assessed (with evidence), not-encountered, inconclusive or not-applicable. Missing evidence is never a pass.',
+  content: 'Act as a separate post-run content reviewer. Inspect visible wording and recorded journeys for terminology, clarity, information gaps and helpful content. Cite screenshot/step evidence. Do not invent missing content, emotions or domain facts. These are expert interpretations, not participant observations. Empty notes are valid. Mark each note basis (recorded-obstacle or expert-risk) and submit coverage for the listed principles; missing evidence is never a pass.',
   complete: 'Review complete. Read usability_get_report with format=markdown and present the short executive report, linking details.md rather than pasting the appendix. Report qualitative patterns, successful paths, conflicting/inconclusive evidence, specialist recommendations, and context/profile limitations. These are synthetic journeys, not independent human research.',
 };
 export class ComparisonReviews {
@@ -71,7 +83,9 @@ export class ComparisonReviews {
   async get(id: string) {
     const report = await this.load(id);
     return { id, revision: report.comparison.revision, stage: report.comparison.nextStage,
-      instructions: instructions[report.comparison.nextStage] + ' ' + CHANGE_INSTRUCTIONS, report,
+      instructions: [instructions[report.comparison.nextStage], CHANGE_INSTRUCTIONS,
+        ...(report.comparison.nextStage === 'ux' || report.comparison.nextStage === 'content' ? [principleChecklist(report.comparison.nextStage), REVIEW_GUARDRAILS] : []),
+        ...(report.comparison.nextStage === 'synthesis' ? ['Principle tags on patterns are optional labels; they never change participant counts.'] : [])].join(' '), report,
       nextTool: report.comparison.nextStage === 'complete' ? 'usability_get_report' : 'usability_submit_review',
       screenshotInstructions: 'Call usability_get_review with sessionId and step to view the recorded before/after screenshots. Inspect screenshots before making visual claims.' };
   }
@@ -142,8 +156,19 @@ export class ComparisonReviews {
         comparison.ungroupedFindingIds = report.findings.filter(f => !assigned.has(f.id)).map(f => f.id);
         comparison.nextStage = 'ux';
       } else {
-        for (const note of submission.notes) { validateEvidence(note.evidence); validateChange(note.suggestedChange, note.evidence); }
-        comparison.reviews[submission.stage] = { status: 'complete', notes: submission.notes };
+        for (const note of submission.notes) {
+          validateEvidence(note.evidence); validateChange(note.suggestedChange, note.evidence);
+          if (note.basis === 'recorded-obstacle' && !note.evidence.some(ref => {
+            const step = report.journeys.find(j => j.sessionId === ref.sessionId)?.steps.find(s => s.step === ref.step);
+            return step && (step.decision.friction || step.decision.behavior !== 'progress');
+          })) throw new ReviewError('A recorded-obstacle note must cite a step with recorded friction or non-progress behaviour. Use basis expert-risk otherwise.');
+        }
+        if (new Set(submission.coverage.map(c => c.principleId)).size !== submission.coverage.length) throw new ReviewError('Record each principle at most once in coverage.');
+        for (const entry of submission.coverage) {
+          if (entry.status === 'assessed' && !entry.evidence.length) throw new ReviewError('Assessed coverage requires step evidence; use inconclusive or not-encountered otherwise.');
+          validateEvidence(entry.evidence);
+        }
+        comparison.reviews[submission.stage] = { status: 'complete', notes: submission.notes, coverage: submission.coverage };
         comparison.nextStage = submission.stage === 'ux' ? 'content' : 'complete';
       }
       comparison.revision++; comparison.lastSubmission = digest;

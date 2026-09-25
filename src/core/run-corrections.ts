@@ -18,6 +18,7 @@ export class RunCorrections {
     if (report.supersededBy) throw new Error(`This run is already superseded by ${report.supersededBy}. Use the latest attempt.`);
     if (!prior.input || (kind === 'session' ? !prior.finishedAt : prior.status === 'running')) throw new Error('Finish or cancel the previous run before replacing it.');
     if (report.kind !== kind || report.target !== (input.platform === 'web' ? safeLocation(input.target) : input.target) || (report.platform ?? 'web') !== input.platform || report.goal !== input.goal || report.scenario !== input.scenario) throw new Error('Corrections must keep the same run type, product, scenario and goal. Different tasks are separate tests, not replacements.');
+    if ((report.exercise ?? 'task') !== ((input as { exercise?: string }).exercise ?? 'task')) throw new Error('A correction must keep the same exercise type; first-impression exercises and task journeys are separate tests.');
     if (prior.continuation) throw new Error('A continuation is a linked journey segment. Start a separate test rather than replacing only a segment.');
     // Do not leave a parent comparison silently counting an invalid child attempt.
     if (kind === 'session') {
@@ -41,7 +42,7 @@ export class RunCorrections {
     if (!input.rerun) return;
     const priorId = input.rerun.priorRunId;
     const prior = JSON.parse(await this.recorder.read(priorId, 'journey'));
-    const changedFields = ['persona', 'personas', 'participantCount', 'contextCheck', 'handoff', 'viewport', 'presentation', 'allowedCapabilities', 'testEnvironment', 'maxActions', 'timeoutMs', 'accessibilityChecks'].filter(key => JSON.stringify(prior.input[key]) !== JSON.stringify(input[key]));
+    const changedFields = ['persona', 'personas', 'participantCount', 'contextCheck', 'handoff', 'viewport', 'presentation', 'allowedCapabilities', 'testEnvironment', 'maxActions', 'timeoutMs', 'accessibilityChecks', 'exercise'].filter(key => JSON.stringify(key === 'exercise' ? prior.input[key] ?? 'task' : prior.input[key]) !== JSON.stringify(input[key]));
     const correction = { ...input.rerun, recordedAt: new Date().toISOString(), changedFields };
     await this.recorder.json(join(this.recorder.paths(id).directory, 'correction.json'), correction);
     // Exclusive claim prevents two simultaneous replacements. The sidecar is durable before browser work.

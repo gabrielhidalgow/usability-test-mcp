@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { capabilitySchema, type Persona, type SessionInput } from '../config/schema.js';
+import { principleIdsSchema } from '../methodology/principles.js';
 
 export const categorySchema = z.enum(['navigation', 'comprehension', 'affordance', 'content', 'form',
   'feedback', 'error-recovery', 'trust', 'accessibility', 'visual-hierarchy', 'other']);
@@ -66,6 +67,7 @@ export const suggestedChangeSchema = z.strictObject({
 export type SuggestedChange = z.infer<typeof suggestedChangeSchema>;
 export const interpretationSchema = z.strictObject({
   suggestedChange: suggestedChangeSchema.optional(),
+  principleIds: principleIdsSchema.optional(),
   category: categorySchema, title: z.string(), stepNumbers: z.array(z.number().int().positive()).min(1),
   likelyUsabilityProblem: z.string(), recommendation: z.string(),
   taskImpact: z.enum(['blocked', 'major-delay', 'minor-delay', 'no-task-impact']),
@@ -91,6 +93,8 @@ export type SessionRecord = {
 };
 export type UsabilityReport = {
   id: string; kind: 'session' | 'round'; synthetic: true; generatedAt: string;
+  methodologyVersion?: string; exercise?: 'task' | 'first-impression';
+  baselineComparison?: import('./run-comparison.js').BaselineComparison;
   platform?: 'web' | 'native'; viewport?: 'desktop' | 'mobile'; target: string; scenario: string; goal: string; disclaimer: string;
   sessions: { id: string; persona: Persona; status: SessionStatus; reason: string;
     continuation?: Continuation; presentation?: 'visible' | 'background'; handoff?: SessionInput['handoff']; contextCheck?: SessionInput['contextCheck']; actions: number; wrongTurns: number; backtracks: number; provider: string }[];

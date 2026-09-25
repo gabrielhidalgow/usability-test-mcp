@@ -33,10 +33,11 @@ export class EvidenceRecorder {
     await this.json(this.paths(session.id).journey, session);
   }
   async provenance(report: UsabilityReport): Promise<UsabilityReport> {
-    for (const [file, key] of [['correction.json', 'correction'], ['superseded.json', 'supersededBy']] as const) {
+    for (const [file, key] of [['correction.json', 'correction'], ['superseded.json', 'supersededBy'], ['baseline-comparison.json', 'baselineComparison']] as const) {
       try {
         const saved = JSON.parse(await readFile(join(this.paths(report.id).directory, file), 'utf8'));
         if (key === 'correction') report.correction = saved;
+        else if (key === 'baselineComparison') report.baselineComparison = saved;
         else report.supersededBy = saved.supersededBy;
       } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
     }

@@ -46,6 +46,7 @@ export const sessionBaseSchema = z.strictObject({
   handoff: handoffSchema.optional(),
   contextCheck: contextCheckSchema.optional(),
   rerun: rerunSchema.optional(),
+  exercise: z.enum(['task', 'first-impression']).default('task'),
   viewport: z.enum(['desktop', 'mobile']).default('desktop'),
   accessibilityChecks: z.boolean().default(true),
   interactionMode: z.enum(['standard', 'keyboard']).default('standard'),
@@ -63,7 +64,7 @@ export const roundInputSchema = sessionBaseSchema.omit({ persona: true }).extend
   personas: z.array(personaSchema).min(1).max(5).optional(),
   participantCount: z.number().int().min(1).max(5).default(3),
   personaContext: z.string().min(1).max(2000).default('A first-time visitor pursuing the supplied goal'),
-}).refine(x => x.platform === 'web' && !x.native && isHttpUrlWithoutCredentials(x.target), 'Rounds currently support web targets only').refine(x => x.testEnvironment || x.allowedCapabilities.length === 0,
+}).refine(x => x.platform === 'web' && !x.native && isHttpUrlWithoutCredentials(x.target), 'Rounds currently support web targets only').refine(x => x.exercise === 'task', 'First-impression exercises are single sessions and are never pooled into rounds').refine(x => x.testEnvironment || x.allowedCapabilities.length === 0,
   'Capability overrides require testEnvironment: true')
   .refine(x => !x.personas || x.personas.length === x.participantCount,
     'personas length must equal participantCount');

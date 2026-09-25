@@ -25,7 +25,7 @@ A superseded report contains only an archive notice and evidence link in place o
 
 ## Recommended actions
 
-Include no more than five actions, ordered by demonstrated task impact, then recurrence. Keep expert suggestions labelled separately. Do not invent an overall score, effort estimates or owners.
+Include no more than three actions (the most serious problems first, as in Krug’s observer sheet), ordered by demonstrated task impact, then recurrence. Keep expert suggestions labelled separately. Do not invent an overall score, effort estimates or owners.
 
 ### 1. [Fix first / Next / Consider / Review suggestion] — [Specific issue]
 
@@ -50,3 +50,8 @@ Repeat only for supported actions. Retain all remaining findings in the evidence
 **Next check:** Retest the same task after changes and compare the evidence. Validate important findings with real people.
 
 [Link to full evidence, journeys, all recommendations, UX/content reviews and limitations.]
+
+## Variants
+
+- **First-impression exercise:** replace outcomes and actions with “What the starting screen communicated”. Label it “not a task outcome” and never pool it with task journeys.
+- **Retest after changes:** add one line under “How to interpret this test” counting baseline findings observed again, not observed on a comparable path, inconclusive and newly observed. Say that absence is not proof of a fix.

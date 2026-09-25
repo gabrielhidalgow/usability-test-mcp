@@ -49,10 +49,10 @@ test('executive report bounds actions, links full evidence and shows concrete co
     suggestedChange: { kind: 'copy' as const, location: 'Home navigation', proposal: 'Name the destination in the link label.', verify: 'Check that a visitor can locate plan pricing.', replacement: { before: 'Options', after: `Pricing ${i + 1}` } } }));
   const report = sessionReport(session('one'), findings);
   const md = renderMarkdown(report, '/artifacts');
-  assert.equal((md.match(/^### /gm) ?? []).length, 5);
+  assert.equal((md.match(/^### /gm) ?? []).length, 3);
   assert.match(md, /Current → proposed:\*\* “Options” → “Pricing 1”/);
   assert.match(md, /Check after the change/);
-  assert.match(md, /3 additional action/);
+  assert.match(md, /5 additional action/);
   assert.match(md, /details.md/);
   assert(!md.includes('Simulated commentary'));
   assert(md.split(/\s+/).length < 800);

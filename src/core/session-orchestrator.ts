@@ -93,7 +93,7 @@ export class SessionOrchestrator {
         const decision = decisionSchema.parse(await run(() => provider.decideNextAction({
           environmentWarnings: record.policyDiagnostics?.some(d => !d.stopsJourney) ? ['Reduced fidelity: background requests were blocked. Their purpose is unknown. Judge only the visible interface; missing content may be a harness restriction, not a product defect.'] : [],
           sessionId: id, presentation: input.presentation, continuation: context?.continuation, priorHistory: context?.priorHistory,
-          persona: input.persona, scenario: input.scenario, goal: input.goal, interactionMode: input.interactionMode,
+          persona: input.persona, scenario: input.scenario, goal: input.goal, interactionMode: input.interactionMode, exercise: input.exercise,
           observation, history: record.journey, signal,
         })));
         collectPolicy();

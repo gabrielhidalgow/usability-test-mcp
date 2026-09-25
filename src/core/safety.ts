@@ -26,6 +26,8 @@ export function isContactNavigation(action: Action, observation: ProductObservat
   return Boolean(ref && observation.candidates.find(c => c.ref === ref)?.contactNavigation);
 }
 export function guardAction(action: Action, observation: ProductObservation, input: SessionInput): string | null {
+  // First-impression exercises follow Krug's home-page tour: look and scroll, but do not click.
+  if (input.exercise === 'first-impression' && action.type !== 'finish' && action.type !== 'scroll') return 'First-impression exercises allow scrolling and finishing only; do not navigate or interact.';
   if (action.type === 'finish' || action.type === 'back' || action.type === 'scroll') return null;
   if (input.interactionMode === 'keyboard' && (action.type === 'click' || action.type === 'tap')) {
     return 'Keyboard sessions cannot click or tap.';

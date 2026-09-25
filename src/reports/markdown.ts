@@ -2,6 +2,13 @@ export { renderExecutiveMarkdown as renderMarkdown } from './executive.js';
 import { relative } from 'node:path';
 import type { SuggestedChange, UsabilityReport } from '../core/types.js';
 import { describeAction } from '../core/action-description.js';
+import { PRINCIPLES } from '../methodology/principles.js';
+
+const METHODOLOGY_DOC = 'https://github.com/gabrielhidalgow/usability-test-mcp/blob/main/docs/METHODOLOGY.md';
+function principleTags(ids: readonly string[] | undefined): string[] {
+  if (!ids?.length) return [];
+  return [`Principles (labels, not evidence): ${ids.map(id => `${id} — ${PRINCIPLES.find(p => p.id === id)?.title ?? 'unknown'}`).map(escape).join('; ')}`, ''];
+}
 
 function escape(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -22,6 +29,7 @@ export function renderDetailedMarkdown(report: UsabilityReport, directory: strin
     `${report.sessions.length} synthetic session(s); ${report.sessions.filter(s => s.status === 'completed').length} reported completion; ${report.findings.length} evidence-linked usability finding(s).`, '',
     '## Task outcomes', '', '| Participant | Outcome | Actions | Simulated wrong turns | Backtracks |',
     '| --- | --- | --- | --- | --- |'];
+  if (report.exercise === 'first-impression') lines.splice(4, 0, '**FIRST-IMPRESSION EXERCISE — the participant only looked at and scrolled the starting screen. There is no task outcome; do not pool with task journeys.**', '');
   if (report.supersededBy) lines.splice(4, 0, `**ARCHIVED ATTEMPT — superseded by ${escape(report.supersededBy)}. All counts and findings below are historical evidence, excluded from current conclusions.**`, '');
   if (report.correction) lines.splice(4, 0, '## Correction history', '',
     `Replaces: ${escape(report.correction.priorRunId)}. Reason: ${escape(report.correction.reason)}. Recorded: ${escape(report.correction.recordedAt)}.`, '',
@@ -53,7 +61,7 @@ export function renderDetailedMarkdown(report: UsabilityReport, directory: strin
       lines.push(`### ${pattern.id} — ${escape(pattern.title)}`, '',
         `${pattern.severity} · Observed in ${pattern.participantCount} simulated journey(s), counting each participant once.`, '',
         `Interface: ${escape(pattern.screenOrControl)}. Obstacle: ${escape(pattern.obstacle)}`, '',
-        `Recommendation: ${escape(pattern.recommendation)}`, '', ...changeDetails(pattern.suggestedChange),
+        `Recommendation: ${escape(pattern.recommendation)}`, '', ...changeDetails(pattern.suggestedChange), ...principleTags(pattern.principleIds),
         `Source findings: ${pattern.findingIds.map(escape).join(', ')}`, '',
         '| Participant ID | Observation | Explanation and evidence |', '| --- | --- | --- |');
       for (const a of pattern.assessments) lines.push(`| ${a.participantId} | ${a.status} | ${escape(a.explanation)} ${evidenceLinks(a.evidence)} |`);
@@ -64,8 +72,17 @@ export function renderDetailedMarkdown(report: UsabilityReport, directory: strin
     for (const role of ['ux', 'content'] as const) {
       const review = comparison.reviews[role];
       lines.push(`## ${role === 'ux' ? 'UX' : 'Content'} expert review`, '', `Status: ${review.status}. Expert interpretations do not count as participant observations.`, '');
-      for (const note of review.notes) lines.push(`### ${escape(note.title)}`, '', escape(note.observation), '', `Recommendation: ${escape(note.recommendation)}`, '', ...changeDetails(note.suggestedChange), evidenceLinks(note.evidence), '');
+      for (const note of review.notes) lines.push(`### ${escape(note.title)}`, '', `Basis: ${note.basis === 'recorded-obstacle' ? 'recorded obstacle (the participant struggled here)' : 'expert-identified risk (not observed as a participant obstacle)'}.`, '', escape(note.observation), '', `Recommendation: ${escape(note.recommendation)}`, '', ...changeDetails(note.suggestedChange), ...principleTags(note.principleIds), evidenceLinks(note.evidence), '');
       if (review.status === 'complete' && !review.notes.length) lines.push('No additional recommendations submitted.', '');
+      if (review.status === 'complete') {
+        lines.push(`#### ${role === 'ux' ? 'UX' : 'Content'} principle coverage`, '');
+        if (!review.coverage?.length) lines.push('Coverage not recorded. This is not evidence that any principle was satisfied.', '');
+        else {
+          lines.push('| Principle | Status | Note and evidence |', '| --- | --- | --- |');
+          for (const entry of review.coverage) lines.push(`| ${escape(entry.principleId)} | ${entry.status} | ${escape(entry.note ?? '')} ${evidenceLinks(entry.evidence)} |`);
+          lines.push('', 'Not-encountered and inconclusive mean the journeys did not provide evidence either way; they are not passes.', '');
+        }
+      }
     }
   }
   for (const s of report.sessions) {
@@ -81,7 +98,7 @@ export function renderDetailedMarkdown(report: UsabilityReport, directory: strin
       `Participants affected: ${issue.participantsAffected.map(escape).join(', ')}`, '',
       `Observed behaviour: ${escape(issue.observedBehaviour)}`, '',
       `Why this may be a usability problem: ${escape(issue.likelyUsabilityProblem)}`, '',
-      `Recommendation: ${escape(issue.recommendation)}`, '', ...changeDetails(issue.suggestedChange), 'Evidence:', '',
+      `Recommendation: ${escape(issue.recommendation)}`, '', ...changeDetails(issue.suggestedChange), ...principleTags(issue.principleIds), 'Evidence:', '',
       ...issue.evidence.map(e => `- ${e.sessionId}, steps ${e.stepNumbers.join(', ')}: ${e.screenshots.map(link).join(' · ')}`), '');
   }
   lines.push('## Participant journeys', '');
@@ -90,6 +107,7 @@ export function renderDetailedMarkdown(report: UsabilityReport, directory: strin
     for (const step of journey.steps) {
       lines.push(`- Step ${step.step}: **${escape(describeAction(step))}** — ${escape(step.result.message)}. ${link(step.before.screenshot.path)}${step.after ? ` → ${link(step.after.screenshot.path)}` : ''}`,
         `  Simulated commentary: ${escape(step.decision.simulatedCommentary)}`);
+      if (step.decision.userExpectation) lines.push(`  Expected: ${escape(step.decision.userExpectation)} → Result: ${step.after ? `${escape(step.after.title)} (${escape(step.after.location)})` : 'no resulting screen recorded'}`);
     }
     lines.push('');
   }
@@ -97,6 +115,15 @@ export function renderDetailedMarkdown(report: UsabilityReport, directory: strin
     lines.push('', '## Browser policy diagnostics', '', 'These are harness restrictions, not product usability findings. No request URLs or response bodies are stored.', '',
       '| Session | Step | Reason | Method / resource | Request context | Effect |', '| --- | --- | --- | --- | --- | --- |');
     for (const d of report.policyDiagnostics) lines.push(`| ${escape(d.sessionId)} | ${d.step} | ${d.reason} (${d.phase}) | ${escape(d.method)} / ${escape(d.resourceType)} | ${d.requestContext ?? 'unknown'}; ${d.destination ?? 'unknown destination'}; purpose unknown | ${d.stopsJourney ? 'Stops journey' : 'Resource blocked; journey may continue with reduced fidelity'} |`);
+  }
+  if (report.baselineComparison) {
+    const c = report.baselineComparison;
+    lines.push('', '## Baseline → retest comparison', '', `Baseline: ${escape(c.baselineId)} · recorded ${escape(c.recordedAt)} · revision ${c.revision}.`, '',
+      c.comparable ? 'Conditions matched: same task, device, profiles and participant count.' : `Not fully comparable: ${c.mismatches.map(escape).join('; ')}. Only observed-again or inconclusive outcomes were allowed.`, '',
+      '| Baseline finding | Outcome | Explanation and retest evidence |', '| --- | --- | --- |');
+    for (const a of c.assessments) lines.push(`| ${escape(a.baselineFindingId)} — ${escape(a.baselineTitle)} | ${a.outcome} | ${escape(a.explanation)} ${a.retestEvidence.map(r => `${r.sessionId}, step ${r.step}`).join(' · ')} |`);
+    lines.push('', `Newly observed in the retest: ${c.newlyObserved.map(n => `${escape(n.retestFindingId)} (${escape(n.title)})`).join(', ') || 'none recorded'}.`, '',
+      'Not observed on a comparable path is not proof of a fix. Participant counts from the two runs are not merged.', '');
   }
   lines.push('', '## Accessibility findings', '', '### Automated', '');
   if (!report.accessibility.length) lines.push('No automated scans were completed.');
@@ -108,6 +135,8 @@ export function renderDetailedMarkdown(report: UsabilityReport, directory: strin
     'Keyboard actions and focused controls appear in the journey JSON. No full keyboard, focus-visibility, or screen-reader compliance claim is made.', '',
     '## Positive observations', '',
     'Successful actions and visible completion evidence are retained in the journeys; no unsupported positive findings are inferred.', '',
+    '## Methodology', '',
+    report.methodologyVersion ? `Findings and reviews used methodology ${escape(report.methodologyVersion)}: principles adapted from Steve Krug (Don’t Make Me Think; Rocket Surgery Made Easy) and Susan Weinschenk (100 Things Every Designer Needs to Know About People). See ${METHODOLOGY_DOC}. Principles are lenses for reading recorded evidence; they are not evidence and do not show that an AI reproduces human perception.` : 'Methodology: not recorded (report created before methodology versioning).', '',
     '## Limitations', '', ...report.limitations.map(l => `- ${escape(l)}`), '');
   return lines.join('\n');
 }

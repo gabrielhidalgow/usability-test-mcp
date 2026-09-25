@@ -20,6 +20,7 @@ export class PlaywrightProductDriver implements ProductDriver {
   private observationSequence = 0;
   private activeCapability: Capability | null = null;
   private denied: string[] = [];
+  private interactionStarted = false;
   private policyDiagnostics: PolicyDiagnostic[] = [];
   takePolicyDiagnostics(): PolicyDiagnostic[] { return this.policyDiagnostics.splice(0); }
   private dialogs: string[] = [];
@@ -61,10 +62,12 @@ export class PlaywrightProductDriver implements ProductDriver {
         const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(request.method());
         const mainFrameNavigation = request.isNavigationRequest() && request.frame() === this.page?.mainFrame();
         const deny = (reason: PolicyDiagnostic['reason'], phase: PolicyDiagnostic['phase']) => {
-          // Still block every forbidden request. Only navigations in the tested page
-          // and mutations stop the journey; failed assets/frames reduce fidelity.
-          const stopsJourney = mainFrameNavigation || mutation;
-          this.policyDiagnostics.push({ reason, phase, method: request.method(), resourceType: request.resourceType(), mainFrameNavigation, stopsJourney });
+          // Timing is not proof of request purpose. Before the first interaction,
+          // blocked background fetches can reduce fidelity without ending a readable run.
+          // After any interaction, keep mutations fatal, including delayed handlers.
+          const requestContext = mainFrameNavigation ? 'main-navigation' : this.interactionStarted ? 'after-interaction' : 'before-first-interaction';
+          const stopsJourney = mainFrameNavigation || (mutation && (this.interactionStarted || !['fetch', 'xhr', 'ping'].includes(request.resourceType())));
+          this.policyDiagnostics.push({ reason, phase, method: request.method(), resourceType: request.resourceType(), mainFrameNavigation, stopsJourney, requestContext, destination: url.origin === origin ? 'same-origin' : 'cross-origin' });
           if (stopsJourney) this.denied.push(`Session safety policy blocked ${reason} (${phase}).`);
         };
         const reason = blockedUrl(url, request.isNavigationRequest(), mainFrameNavigation && ['GET', 'HEAD'].includes(request.method())) ?? (mutation &&
@@ -86,6 +89,9 @@ export class PlaywrightProductDriver implements ProductDriver {
           } catch { await route.abort('failed').catch(() => {}); }
         } else await route.continue();
       });
+      // Viewer interaction is conservative too. This binding only tightens policy.
+      await this.context.exposeBinding('__usabilityInteractionStarted', () => { this.interactionStarted = true; });
+      await this.context.addInitScript({ content: `for (const event of ['pointerdown', 'keydown', 'submit']) addEventListener(event, e => { if (e.isTrusted) void globalThis.__usabilityInteractionStarted(); }, true);` });
       this.page = await this.context.newPage();
       this.page.on('close', () => { if (!this.stopping && !config.signal.aborted) config.onWindowClosed?.(); });
       if (this.visible) await installObserver(this.page);
@@ -239,7 +245,7 @@ export class PlaywrightProductDriver implements ProductDriver {
       viewport: page.viewportSize()!, capture, screenshot: await this.screenshot(), dialogs: this.dialogs.splice(0) };
   }
   private async perform(operation: () => Promise<unknown>): Promise<ActionResult> {
-    this.currentPage(); this.denied = [];
+    this.currentPage(); this.interactionStarted = true; this.denied = [];
     try {
       await operation();
       // A frame lets client-side event handlers update visible state; no network-idle dependency.

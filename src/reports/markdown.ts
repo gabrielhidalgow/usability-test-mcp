@@ -95,8 +95,8 @@ export function renderDetailedMarkdown(report: UsabilityReport, directory: strin
   }
   if (report.policyDiagnostics?.length) {
     lines.push('', '## Browser policy diagnostics', '', 'These are harness restrictions, not product usability findings. No request URLs or response bodies are stored.', '',
-      '| Session | Step | Reason | Method / resource | Effect |', '| --- | --- | --- | --- | --- |');
-    for (const d of report.policyDiagnostics) lines.push(`| ${escape(d.sessionId)} | ${d.step} | ${d.reason} (${d.phase}) | ${escape(d.method)} / ${escape(d.resourceType)} | ${d.stopsJourney ? 'Stops journey' : 'Resource blocked; journey may continue with reduced fidelity'} |`);
+      '| Session | Step | Reason | Method / resource | Request context | Effect |', '| --- | --- | --- | --- | --- | --- |');
+    for (const d of report.policyDiagnostics) lines.push(`| ${escape(d.sessionId)} | ${d.step} | ${d.reason} (${d.phase}) | ${escape(d.method)} / ${escape(d.resourceType)} | ${d.requestContext ?? 'unknown'}; ${d.destination ?? 'unknown destination'}; purpose unknown | ${d.stopsJourney ? 'Stops journey' : 'Resource blocked; journey may continue with reduced fidelity'} |`);
   }
   lines.push('', '## Accessibility findings', '', '### Automated', '');
   if (!report.accessibility.length) lines.push('No automated scans were completed.');

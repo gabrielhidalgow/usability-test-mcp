@@ -169,3 +169,46 @@ test('captures wait for finite entrance motion but bound continuously moving con
     assert(moving.report.limitations.some(l=>l.includes('did not settle')));
   } finally {await new Promise<void>(resolve=>site.close(()=>resolve()));await rm(root,{recursive:true,force:true});}
 });
+
+test('pre-interaction background writes stay blocked with warnings; delayed writes after interaction remain fatal', async () => {
+  let writes = 0; let forbiddenReads = 0;
+  const site = createServer((req,res) => {
+    if (req.method === 'POST') writes++;
+    if (req.url?.startsWith('/share/')) forbiddenReads++;
+    res.setHeader('Content-Type','text/html');
+    res.end(`<h1>Readable product</h1><button onclick="setTimeout(()=>fetch('/write?token=secret-request',{method:'POST',body:'secret-body'}).catch(()=>{}),150)">Explore</button><script>
+      fetch('/write?token=secret-request',{method:'POST',body:'secret-body'}).catch(()=>{});
+      fetch('/share/data?token=secret-request').catch(()=>{});
+      const xhr=new XMLHttpRequest();xhr.open('POST','/xhr');xhr.send('secret-body');
+      navigator.sendBeacon('/beacon','secret-body');
+    </script>`);
+  });
+  await new Promise<void>(resolve=>site.listen(0,'127.0.0.1',resolve));
+  const address=site.address();assert(address&&typeof address!=='string');
+  const root=await mkdtemp(join(tmpdir(),'background-writes-'));
+  const runner=new SessionOrchestrator(new EvidenceRecorder(root),()=>new PlaywrightProductDriver());
+  const input={...fixtureInput(`http://127.0.0.1:${address.port}/`),accessibilityChecks:false};
+  try {
+    const provider=new FixtureProvider();provider.evaluateObservation=async()=>[];
+    provider.decideNextAction=async({observation,environmentWarnings})=>{
+      assert.match(environmentWarnings?.join(' ')??'',/Reduced fidelity/);
+      assert.match(observation.visibleText,/Readable product/);
+      return makeDecision({type:'finish',outcome:'completed',reason:'Heading visible',visibleEvidence:'Readable product'});
+    };
+    const readable=await runner.run(input,provider);assert.equal(readable.session.status,'completed');
+    assert.equal(writes,0);assert.equal(forbiddenReads,0);
+    const diagnostics=readable.report.policyDiagnostics!;
+    for(const resource of ['fetch','xhr','ping'])assert(diagnostics.some(d=>d.resourceType===resource&&d.method==='POST'&&!d.stopsJourney&&d.requestContext==='before-first-interaction'));
+    assert(diagnostics.every(d=>d.destination==='same-origin'));
+    assert(!JSON.stringify(diagnostics).includes('secret-'));
+    assert.match(await readFile(readable.paths.details,'utf8'),/purpose unknown/);
+    provider.decideNextAction=async({observation,history})=>{
+      if(!history.length)return makeDecision({type:'click',target:observation.candidates.find(c=>c.name==='Explore')!.ref,capability:null});
+      await delay(300);
+      return makeDecision({type:'finish',outcome:'completed',reason:'Still visible',visibleEvidence:'Readable product'});
+    };
+    const delayed=await runner.run(input,provider);assert.equal(delayed.session.status,'blocked');
+    assert(delayed.report.policyDiagnostics?.some(d=>d.method==='POST'&&d.stopsJourney&&d.requestContext==='after-interaction'));
+    assert.equal(writes,0);assert.equal(forbiddenReads,0);
+  } finally {await new Promise<void>(resolve=>site.close(()=>resolve()));await rm(root,{recursive:true,force:true});}
+});

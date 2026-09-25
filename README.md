@@ -387,3 +387,9 @@ Saved-project runs accept an optional `options` object with `timeoutMs` (up to 6
 ```
 
 These options are recorded alongside the approved plan in the run's `project.json`. They do not enable consequential capabilities or change the plan's target, persona, scenario or goal. Use `usability_continue_session` for a linked web continuation with a fresh browser. It is not an uninterrupted journey or an independent new participant.
+
+## Background request restrictions
+
+Blocked fetch/XHR/beacon requests before the first browser interaction no longer stop a readable page automatically. They are still aborted: this does not allow analytics, submissions or other writes through. The participant packet receives a reduced-fidelity warning; reports retain each restriction, timing category and same-/cross-origin classification. Purpose remains unknown. URLs, query strings, bodies and headers are not stored in diagnostics.
+
+This classification uses timing, not reliable causal attribution. After the first browser interaction, blocked mutations remain fatal, including delayed handlers and requests on later pages. Main-frame navigation blocks and non-background mutations remain fatal. A missing interface cannot be claimed successful merely because the run continues. Inspect visible evidence and do not label harness-altered content a product defect. No communication capability or test-environment override is needed for this change.

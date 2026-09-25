@@ -43,7 +43,7 @@ export class HostReasoningProvider implements ReasoningProvider {
 
 export function participantPayload(input: ParticipantDecisionInput) {
   const { screenshot: _screenshot, ...observation } = input.observation;
-  return { sessionId: input.sessionId, continuation: input.continuation,
+  return { sessionId: input.sessionId, environmentWarnings: input.environmentWarnings, continuation: input.continuation,
     priorHistory: input.priorHistory?.map(h => ({ sessionId: h.sessionId, steps: h.steps.slice(-20).map(s => ({ step: s.step, state: s.decision.stateSummary, simulatedCommentary: s.decision.simulatedCommentary, action: s.decision.selectedAction, result: s.result })) })), persona: input.persona, scenario: input.scenario, goal: input.goal,
     interactionMode: input.interactionMode, observation,
     history: input.history.slice(-20).map(s => ({ step: s.step, state: s.decision.stateSummary,

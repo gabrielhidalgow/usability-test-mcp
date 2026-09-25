@@ -91,6 +91,7 @@ export class SessionOrchestrator {
         stage = 'participant-reasoning';
         await driver.setViewStatus?.({ participant: input.persona.name, step: record.journey.length + 1, phase: 'waiting' });
         const decision = decisionSchema.parse(await run(() => provider.decideNextAction({
+          environmentWarnings: record.policyDiagnostics?.some(d => !d.stopsJourney) ? ['Reduced fidelity: background requests were blocked. Their purpose is unknown. Judge only the visible interface; missing content may be a harness restriction, not a product defect.'] : [],
           sessionId: id, presentation: input.presentation, continuation: context?.continuation, priorHistory: context?.priorHistory,
           persona: input.persona, scenario: input.scenario, goal: input.goal, interactionMode: input.interactionMode,
           observation, history: record.journey, signal,

@@ -43,6 +43,8 @@ export type ProductObservation = {
   capture?: { settled: boolean; waitedMs: number; reason: string };
 };
 export type PolicyDiagnostic = {
+  requestContext?: 'before-first-interaction' | 'after-interaction' | 'main-navigation';
+  destination?: 'same-origin' | 'cross-origin';
   reason: 'unsupported-protocol' | 'credentialed-url' | 'cross-origin-navigation' | 'capability-denied' | 'mutation-denied';
   phase: 'request' | 'redirect'; method: string; resourceType: string;
   mainFrameNavigation: boolean; stopsJourney: boolean;

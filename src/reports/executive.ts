@@ -1,4 +1,5 @@
 import { contextQuality } from '../core/context-quality.js';
+import { describePolicy, summarizePolicy } from '../core/policy-summary.js';
 import { relative } from 'node:path';
 import type { SuggestedChange, UsabilityReport } from '../core/types.js';
 
@@ -73,8 +74,9 @@ export function renderExecutiveMarkdown(report: UsabilityReport, directory: stri
     '**Evidence from synthetic participants, not human research.** Completion and findings are model judgments.', ''];
   if (report.sessions.some(s => s.provider.includes('test-double'))) lines.push('**DEMO / TEST DOUBLE — fixture verification, not AI usability research.**', '');
   const contexts = [...new Set(quality.map(q => q.isolation))].join(', ') || 'unknown';
+  const policy = summarizePolicy(report.policyDiagnostics);
   const gaps = [completed < outcomes.length ? `${outcomes.length - completed} incomplete journey(s)` : '',
-    report.policyDiagnostics?.length ? `${report.policyDiagnostics.length} browser restriction(s)` : '',
+    policy.affectsFidelity ? 'blocked page resources or site requests may have changed what was shown' : '',
     /\b(pdf|download|data\s?sheet)\b/i.test(`${report.goal} ${report.scenario}`) ? 'PDF/download completion is unsupported' : ''].filter(Boolean);
   lines.push('## How to interpret this test', '',
     `- **Method:** ${quality.some(q => q.method === 'informed walkthrough') ? 'Includes informed walkthroughs' : 'Simulated journeys'}; no real participants.${report.methodologyVersion ? ` Reviewed with methodology ${report.methodologyVersion} (Krug, Weinschenk).` : ''}`,
@@ -127,8 +129,7 @@ export function renderExecutiveMarkdown(report: UsabilityReport, directory: stri
   }
   if (!positives.length) lines.push('No specific positive observation was supported; consult the journeys before changing successful parts of the interface.');
   lines.push('', '## Evidence limits and next check', '');
-  const diagnostics = report.policyDiagnostics?.length ?? 0;
-  if (diagnostics) lines.push(`**Browser policy diagnostics:** ${diagnostics} restriction event(s) may have altered the interface. Treat affected findings as provisional; resolve test-environment restrictions first.`, '');
+  if (policy.total) lines.push(`**Blocked requests:** ${describePolicy(policy)}. All were blocked by the test's safety policy.${policy.affectsFidelity ? ' Treat findings about missing or broken content as provisional.' : ' None changed what the participant saw.'}`, '');
   if (report.limitations.some(l => /did not settle|transient visual/i.test(l))) lines.push('Some screenshots did not settle. Recheck transient visual findings before changing the design.', '');
   const rules = new Set(report.accessibility.flatMap(scan => scan.findings.map(f => f.id)));
   const errors = report.accessibility.filter(scan => scan.error).length;

@@ -140,7 +140,7 @@ test('blocked passive resources are diagnosed without ending a readable journey 
     assert(run.report.policyDiagnostics?.some(d => d.reason === 'cross-origin-navigation' && !d.mainFrameNavigation && !d.stopsJourney));
     assert(!JSON.stringify(run.report.policyDiagnostics).includes('private-canary'));
     assert(run.report.limitations.some(l => l.includes('Background resources')));
-    assert.match(await readFile(run.paths.report, 'utf8'), /Browser policy diagnostics/);
+    assert.match(await readFile(run.paths.report, 'utf8'), /Blocked requests:\*\* [^\n]*page resource\(s\)[^\n]*provisional/);
     assert.equal(run.report.findings.length, 0);
   } finally { await new Promise<void>(resolve => site.close(() => resolve())); await rm(root, { recursive: true, force: true }); }
 });
@@ -230,7 +230,7 @@ test('third-party tracking writes after a click stay blocked but do not end the 
   try {
     const provider = new FixtureProvider(); provider.evaluateObservation = async () => [];
     provider.decideNextAction = async ({ observation, environmentWarnings }) => observation.visibleText.includes('Gold $159')
-      ? (assert.match(environmentWarnings?.join(' ') ?? '', /Reduced fidelity/), makeDecision({ type: 'finish', outcome: 'completed', reason: 'Price visible', visibleEvidence: 'Gold $159 per month' }))
+      ? (assert.deepEqual(environmentWarnings, [], 'third-party tracking alone does not reduce fidelity'), makeDecision({ type: 'finish', outcome: 'completed', reason: 'Price visible', visibleEvidence: 'Gold $159 per month' }))
       : makeDecision({ type: 'click', target: observation.candidates.find(c => c.name === 'Pricing')!.ref, capability: null });
     const run = await new SessionOrchestrator(new EvidenceRecorder(root), () => new PlaywrightProductDriver())
       .run({ ...fixtureInput(`http://127.0.0.1:${address.port}/`), accessibilityChecks: false }, provider);
@@ -238,5 +238,11 @@ test('third-party tracking writes after a click stay blocked but do not end the 
     const after = run.report.policyDiagnostics!.filter(d => d.requestContext === 'after-interaction' && d.method === 'POST');
     assert(after.length > 0 && after.every(d => d.destination === 'third-party' && !d.stopsJourney));
     assert.equal(writes, 0, 'blocked requests never reach the tracker');
+    assert(!run.session.warnings.some(w => w.includes('Background resources were blocked')));
+    const md = await readFile(run.paths.report, 'utf8');
+    assert.match(md, /third-party tracking request\(s\) \(no effect on what was shown\)/); assert.match(md, /None changed what the participant saw/);
+    assert.doesNotMatch(md, /Coverage gaps:\*\* [^\n]*blocked/);
+    const details = await readFile(run.paths.details, 'utf8');
+    assert.match(details, /\| tracking \| mutation-denied \(request\) \|/);
   } finally { await new Promise<void>(r => site.close(() => r())); await new Promise<void>(r => tracker.close(() => r())); await rm(root, { recursive: true, force: true }); }
 });

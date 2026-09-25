@@ -4,6 +4,7 @@ import type { SuggestedChange, UsabilityReport } from '../core/types.js';
 import { describeAction } from '../core/action-description.js';
 import { PRINCIPLES } from '../methodology/principles.js';
 import { isOutsideFocusOnly } from './executive.js';
+import { describePolicy, policyEffect, summarizePolicy } from '../core/policy-summary.js';
 
 const METHODOLOGY_DOC = 'https://github.com/gabrielhidalgow/usability-test-mcp/blob/main/docs/METHODOLOGY.md';
 function principleTags(ids: readonly string[] | undefined): string[] {
@@ -116,10 +117,20 @@ export function renderDetailedMarkdown(report: UsabilityReport, directory: strin
     lines.push('');
   }
   if (report.policyDiagnostics?.length) {
-    lines.push('', '## Browser policy diagnostics', '', 'These are harness restrictions, not product usability findings. No request URLs or response bodies are stored.', '',
-      '| Session | Step | Reason | Method / resource | Request context | Effect |', '| --- | --- | --- | --- | --- | --- |');
-    for (const d of report.policyDiagnostics) lines.push(`| ${escape(d.sessionId)} | ${d.step} | ${d.reason} (${d.phase}) | ${escape(d.method)} / ${escape(d.resourceType)} | ${d.requestContext ?? 'unknown'}; ${d.destination ?? 'unknown destination'}; purpose unknown | ${d.stopsJourney ? 'Stops journey' : 'Resource blocked; journey may continue with reduced fidelity'} |`);
+    lines.push('', '## Browser policy diagnostics', '', 'These are harness restrictions, not product usability findings. Request purpose unknown: tracking is inferred from a third-party destination, not verified. No request URLs or response bodies are stored.', '',
+      `Summary: ${describePolicy(summarizePolicy(report.policyDiagnostics))}.`, '',
+      '| Effect | Reason | Method / resource | Request context | Destination | Journey | Count | Steps |', '| --- | --- | --- | --- | --- | --- | --- | --- |');
+    // Identical events repeat on every page (tracking pings); one row per kind keeps the appendix readable.
+    const groups = new Map<string, { d: NonNullable<typeof report.policyDiagnostics>[number]; count: number; steps: Set<string> }>();
+    for (const d of report.policyDiagnostics) {
+      const key = [policyEffect(d), d.reason, d.phase, d.method, d.resourceType, d.requestContext, d.destination, d.stopsJourney].join('|');
+      const group = groups.get(key) ?? { d, count: 0, steps: new Set<string>() };
+      group.count++; group.steps.add(report.sessions.length > 1 ? `${d.sessionId.slice(0, 16)}… step ${d.step}` : String(d.step));
+      groups.set(key, group);
+    }
+    for (const { d, count, steps } of groups.values()) lines.push(`| ${policyEffect(d)} | ${d.reason} (${d.phase}) | ${escape(d.method)} / ${escape(d.resourceType)} | ${d.requestContext ?? 'unknown'} | ${d.destination ?? 'unknown'} | ${d.stopsJourney ? 'Stopped journey' : 'Continued'} | ${count} | ${[...steps].map(escape).join(', ')} |`);
   }
+
   if (report.baselineComparison) {
     const c = report.baselineComparison;
     lines.push('', '## Baseline → retest comparison', '', `Baseline: ${escape(c.baselineId)} · recorded ${escape(c.recordedAt)} · revision ${c.revision}.`, '',

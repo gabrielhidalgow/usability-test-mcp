@@ -3,6 +3,7 @@ import { isInFocus, sessionInputSchema, type SessionInput } from '../config/sche
 import { decisionSchema, interpretationSchema, type Action, type ActionResult, type Continuation, type PriorHistory, type Interpretation, type JourneyStep, type ProductObservation, type RunResult, type SessionRecord } from './types.js';
 import { guardAction, isContactNavigation, safeLocation } from './safety.js';
 import { sessionReport } from './synthesis.js';
+import { policyEffect } from './policy-summary.js';
 import { BrowserWindowClosed, type ProductDriver } from '../drivers/product-driver.js';
 import type { ReasoningProvider } from '../reasoning/provider.js';
 import { EvidenceRecorder } from '../evidence/recorder.js';
@@ -57,7 +58,7 @@ export class SessionOrchestrator {
       const events = driver.takePolicyDiagnostics?.() ?? [];
       record.policyDiagnostics ??= [];
       record.policyDiagnostics.push(...events.map(event => ({ ...event, step: record.actions })));
-      if (events.some(e => !e.stopsJourney) && !record.warnings.includes('Background resources were blocked by safety policy; rendered content may differ from a normal browser.')) {
+      if (events.some(e => !e.stopsJourney && policyEffect(e) !== 'tracking') && !record.warnings.includes('Background resources were blocked by safety policy; rendered content may differ from a normal browser.')) {
         record.warnings.push('Background resources were blocked by safety policy; rendered content may differ from a normal browser.');
       }
       const fatal = events.find(e => e.stopsJourney);
@@ -94,7 +95,7 @@ export class SessionOrchestrator {
         stage = 'participant-reasoning';
         await driver.setViewStatus?.({ participant: input.persona.name, step: record.journey.length + 1, phase: 'waiting' });
         const decision = decisionSchema.parse(await run(() => provider.decideNextAction({
-          environmentWarnings: record.policyDiagnostics?.some(d => !d.stopsJourney) ? ['Reduced fidelity: background requests were blocked. Their purpose is unknown. Judge only the visible interface; missing content may be a harness restriction, not a product defect.'] : [],
+          environmentWarnings: record.policyDiagnostics?.some(d => !d.stopsJourney && policyEffect(d) !== 'tracking') ? ['Reduced fidelity: background requests were blocked. Their purpose is unknown. Judge only the visible interface; missing content may be a harness restriction, not a product defect.'] : [],
           sessionId: id, presentation: input.presentation, continuation: context?.continuation, priorHistory: context?.priorHistory,
           persona: input.persona, scenario: input.scenario, goal: input.goal, interactionMode: input.interactionMode, exercise: input.exercise,
           observation, history: record.journey, signal,

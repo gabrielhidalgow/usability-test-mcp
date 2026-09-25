@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { chromium, devices, type Browser, type BrowserContext, type ElementHandle, type Page } from 'playwright';
 import { AxeBuilder } from '@axe-core/playwright';
 import type { Capability } from '../../config/schema.js';
-import { isContactPath, labelCapabilities, permits, redact, safeLocation } from '../../core/safety.js';
+import { isContactPath, labelCapabilities, permits, siteKey, redact, safeLocation } from '../../core/safety.js';
 import type { AccessibilityScan, ActionResult, Candidate, EvidenceArtifact, InteractionTarget, PolicyDiagnostic, ProductObservation } from '../../core/types.js';
 import { installObserver, showStatus, OBSERVER_SELECTOR } from './observer.js';
 import type { ViewStatus, DriverStartConfig, ProductDriver } from '../product-driver.js';
@@ -66,8 +66,12 @@ export class PlaywrightProductDriver implements ProductDriver {
           // blocked background fetches can reduce fidelity without ending a readable run.
           // After any interaction, keep mutations fatal, including delayed handlers.
           const requestContext = mainFrameNavigation ? 'main-navigation' : this.interactionStarted ? 'after-interaction' : 'before-first-interaction';
-          const stopsJourney = mainFrameNavigation || (mutation && (this.interactionStarted || !['fetch', 'xhr', 'ping'].includes(request.resourceType())));
-          this.policyDiagnostics.push({ reason, phase, method: request.method(), resourceType: request.resourceType(), mainFrameNavigation, stopsJourney, requestContext, destination: url.origin === origin ? 'same-origin' : 'cross-origin' });
+          // Blocked third-party background writes (analytics, ad pixels) only reduce fidelity. A blocked write to the
+          // product's own site after an interaction may be the participant's submission, so it still ends the journey.
+          const destination = url.origin === origin ? 'same-origin' : siteKey(url.hostname) === siteKey(new URL(origin).hostname) ? 'same-site' : 'third-party';
+          const background = ['fetch', 'xhr', 'ping'].includes(request.resourceType());
+          const stopsJourney = mainFrameNavigation || (mutation && (!background || (this.interactionStarted && destination !== 'third-party')));
+          this.policyDiagnostics.push({ reason, phase, method: request.method(), resourceType: request.resourceType(), mainFrameNavigation, stopsJourney, requestContext, destination });
           if (stopsJourney) this.denied.push(`Session safety policy blocked ${reason} (${phase}).`);
         };
         const reason = blockedUrl(url, request.isNavigationRequest(), mainFrameNavigation && ['GET', 'HEAD'].includes(request.method())) ?? (mutation &&

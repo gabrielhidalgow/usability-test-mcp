@@ -63,6 +63,16 @@ export function guardAction(action: Action, observation: ProductObservation, inp
   return null;
 }
 
+// Approximate registrable domain ("site"): www.rewardpay.com.au and api.rewardpay.com.au share one,
+// google-analytics.com does not. Hosts under common two-level suffixes (com.au, co.uk) keep three labels.
+const SECOND_LEVEL = new Set(['com', 'net', 'org', 'edu', 'gov', 'co', 'ac', 'asn', 'id', 'or', 'ne', 'go']);
+export function siteKey(hostname: string): string {
+  const host = hostname.toLowerCase().replace(/\.$/, '');
+  if (/^[\d.]+$/.test(host) || host.includes(':') || !host.includes('.')) return host;
+  const labels = host.split('.');
+  const keep = labels.length >= 3 && labels.at(-1)!.length === 2 && SECOND_LEVEL.has(labels.at(-2)!) ? 3 : 2;
+  return labels.slice(-keep).join('.');
+}
 export function safeLocation(value: string): string {
   try {
     const url = new URL(value);

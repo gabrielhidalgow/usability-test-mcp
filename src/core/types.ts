@@ -45,7 +45,8 @@ export type ProductObservation = {
 };
 export type PolicyDiagnostic = {
   requestContext?: 'before-first-interaction' | 'after-interaction' | 'main-navigation';
-  destination?: 'same-origin' | 'cross-origin';
+  // 'cross-origin' appears only in reports saved before same-site/third-party classification.
+  destination?: 'same-origin' | 'same-site' | 'third-party' | 'cross-origin';
   reason: 'unsupported-protocol' | 'credentialed-url' | 'cross-origin-navigation' | 'capability-denied' | 'mutation-denied';
   phase: 'request' | 'redirect'; method: string; resourceType: string;
   mainFrameNavigation: boolean; stopsJourney: boolean;

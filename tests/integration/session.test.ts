@@ -212,3 +212,31 @@ test('pre-interaction background writes stay blocked with warnings; delayed writ
     assert.equal(writes,0);assert.equal(forbiddenReads,0);
   } finally {await new Promise<void>(resolve=>site.close(()=>resolve()));await rm(root,{recursive:true,force:true});}
 });
+
+test('third-party tracking writes after a click stay blocked but do not end the journey', async () => {
+  let writes = 0;
+  const tracker = createServer((req, res) => { if (req.method === 'POST') writes++; res.end('ok'); });
+  await new Promise<void>(resolve => tracker.listen(0, '127.0.0.1', resolve));
+  const trackerPort = (tracker.address() as { port: number }).port;
+  const site = createServer((req, res) => {
+    res.setHeader('Content-Type', 'text/html');
+    // 'localhost' is a different site from '127.0.0.1', standing in for an analytics domain.
+    const track = `fetch('http://localhost:${trackerPort}/collect',{method:'POST',body:'event'}).catch(()=>{});navigator.sendBeacon('http://localhost:${trackerPort}/b','x')`;
+    res.end(req.url === '/pricing' ? `<h1>Pricing</h1><p>Gold $159 per month</p><script>${track}</script>` : `<h1>Home</h1><a href="/pricing" onclick="${track.replace(/"/g, '&quot;')}">Pricing</a>`);
+  });
+  await new Promise<void>(resolve => site.listen(0, '127.0.0.1', resolve));
+  const address = site.address(); assert(address && typeof address !== 'string');
+  const root = await mkdtemp(join(tmpdir(), 'third-party-writes-'));
+  try {
+    const provider = new FixtureProvider(); provider.evaluateObservation = async () => [];
+    provider.decideNextAction = async ({ observation, environmentWarnings }) => observation.visibleText.includes('Gold $159')
+      ? (assert.match(environmentWarnings?.join(' ') ?? '', /Reduced fidelity/), makeDecision({ type: 'finish', outcome: 'completed', reason: 'Price visible', visibleEvidence: 'Gold $159 per month' }))
+      : makeDecision({ type: 'click', target: observation.candidates.find(c => c.name === 'Pricing')!.ref, capability: null });
+    const run = await new SessionOrchestrator(new EvidenceRecorder(root), () => new PlaywrightProductDriver())
+      .run({ ...fixtureInput(`http://127.0.0.1:${address.port}/`), accessibilityChecks: false }, provider);
+    assert.equal(run.session.status, 'completed', run.session.reason);
+    const after = run.report.policyDiagnostics!.filter(d => d.requestContext === 'after-interaction' && d.method === 'POST');
+    assert(after.length > 0 && after.every(d => d.destination === 'third-party' && !d.stopsJourney));
+    assert.equal(writes, 0, 'blocked requests never reach the tracker');
+  } finally { await new Promise<void>(r => site.close(() => r())); await new Promise<void>(r => tracker.close(() => r())); await rm(root, { recursive: true, force: true }); }
+});

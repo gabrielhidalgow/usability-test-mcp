@@ -41,3 +41,13 @@ test('artifact IDs reject path traversal and common log secrets are redacted', (
   assert(!redact('Bearer abc123 api_key=secret sk-foobar').includes('abc123'));
   assert(!redact('api_key=secret').includes('=secret'));
 });
+
+test('site classification separates the product (incl. subdomains) from third parties', async () => {
+  const { siteKey } = await import('../../src/core/safety.js');
+  assert.equal(siteKey('www.rewardpay.com.au'), siteKey('api.rewardpay.com.au'));
+  assert.notEqual(siteKey('www.rewardpay.com.au'), siteKey('www.google-analytics.com'));
+  assert.notEqual(siteKey('rewardpay.com.au'), siteKey('other.com.au'), 'com.au is a public suffix, not a shared site');
+  assert.equal(siteKey('shop.example.co.uk'), 'example.co.uk');
+  assert.equal(siteKey('app.example.com'), 'example.com');
+  assert.notEqual(siteKey('127.0.0.1'), siteKey('localhost'));
+});

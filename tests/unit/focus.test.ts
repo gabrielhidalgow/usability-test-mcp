@@ -15,6 +15,9 @@ test('focus paths are same-origin prefixes and never escape the product', () => 
   assert(isInFocus(focus, 'https://shop.example/checkout')); assert(isInFocus(focus, 'https://shop.example/checkout/step-2'));
   assert(isInFocus(focus, 'https://shop.example/cart')); assert(!isInFocus(focus, 'https://shop.example/checkout-help'));
   assert(!isInFocus(focus, 'https://shop.example/')); assert(isInFocus(undefined, 'https://shop.example/anything'));
+  const home = focusSchema.parse({ name: 'Home and pricing', includePaths: ['/', '/pricing'] });
+  assert(isInFocus(home, 'https://shop.example/')); assert(isInFocus(home, 'https://shop.example/pricing/gold'));
+  assert(!isInFocus(home, 'https://shop.example/contact-us'), '"/" means the home page only, not every page');
   for (const bad of ['//evil.example/x', '/\\evil.example', 'https://evil.example/', '/cart?token=1', 'checkout']) assert(!focusSchema.safeParse({ name: 'x', startPath: bad }).success, bad);
   assert.equal(focusStartUrl('https://shop.example/home', focusSchema.parse({ name: 'x', startPath: '/cart' })), 'https://shop.example/cart');
   assert(!sessionInputSchema.safeParse({ platform: 'native', target: 'com.example.app', native: { deviceId: 'emulator-5554', os: 'android', preparedTestDevice: true }, testEnvironment: true, accessibilityChecks: false,

@@ -50,8 +50,10 @@ export function isInFocus(focus: Focus | undefined, location: string): boolean {
   let path: string;
   try { path = new URL(location).pathname; } catch { return false; }
   return focus.includePaths.some(prefix => {
+    // '/' means the home page only; an unfocused test already covers the whole site.
+    if (prefix === '/') return path === '/' || path === '';
     const base = prefix.replace(/\/+$/, '');
-    return base === '' || path === base || path.startsWith(`${base}/`);
+    return path === base || path.startsWith(`${base}/`);
   });
 }
 /** Resolve a focus start page against the product URL; never leaves the product's origin. */

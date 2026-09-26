@@ -51,7 +51,8 @@ export type PolicyDiagnostic = {
   phase: 'request' | 'redirect'; method: string; resourceType: string;
   mainFrameNavigation: boolean; stopsJourney: boolean;
 };
-export type ActionResult = { ok: boolean; message: string; blocked?: boolean };
+export type PrototypeTap = { screenId: string; target: 'hit' | 'miss' | 'unscored'; movedOn?: boolean };
+export type ActionResult = { ok: boolean; message: string; blocked?: boolean; prototype?: PrototypeTap };
 export type AxeFinding = { id: string; impact: string | null; description: string; helpUrl: string; targets: string[] };
 export type AccessibilityScan = { step: number; screenshot: string; findings: AxeFinding[]; error?: string };
 export type JourneyStep = {
@@ -100,7 +101,7 @@ export type UsabilityReport = {
   methodologyVersion?: string; exercise?: 'task' | 'first-impression';
   focus?: SessionInput['focus'];
   baselineComparison?: import('./run-comparison.js').BaselineComparison;
-  platform?: 'web' | 'native'; viewport?: 'desktop' | 'mobile'; target: string; scenario: string; goal: string; disclaimer: string;
+  platform?: 'web' | 'native' | 'prototype'; viewport?: 'desktop' | 'mobile'; target: string; scenario: string; goal: string; disclaimer: string;
   sessions: { id: string; persona: Persona; status: SessionStatus; reason: string;
     continuation?: Continuation; presentation?: 'visible' | 'background'; handoff?: SessionInput['handoff']; contextCheck?: SessionInput['contextCheck']; focusExit?: boolean; actions: number; wrongTurns: number; backtracks: number; provider: string }[];
   correction?: { priorRunId: string; reason: string; changes: string; recordedAt: string; changedFields: string[] };

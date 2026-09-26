@@ -66,7 +66,7 @@ export function focusStartUrl(target: string, focus: Focus | undefined): string 
 }
 export const sessionBaseSchema = z.strictObject({
   target: z.string().min(1).max(4000),
-  platform: z.enum(['web', 'native']).default('web'),
+  platform: z.enum(['web', 'native', 'prototype']).default('web'),
   native: z.strictObject({ deviceId: z.string().regex(/^[A-Za-z0-9_.:-]{1,160}$/), os: z.enum(['ios', 'android']), preparedTestDevice: z.literal(true) }).optional(),
   persona: personaSchema,
   scenario: z.string().min(1).max(4000),
@@ -85,12 +85,17 @@ export const sessionBaseSchema = z.strictObject({
   testEnvironment: z.boolean().default(false),
   allowedCapabilities: z.array(capabilitySchema).default([]),
 });
-export const sessionInputSchema = sessionBaseSchema.refine(x => x.platform === 'web'
-  ? isHttpUrlWithoutCredentials(x.target) && !x.native
-  : /^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+$/.test(x.target) && Boolean(x.native) && x.testEnvironment && x.allowedCapabilities.length === 0 && !x.accessibilityChecks && x.interactionMode === 'standard',
-  'Web requires an HTTP(S) URL without credentials. Native requires an app ID, a prepared test device, testEnvironment=true, no capability overrides, no axe scans and standard interaction.').refine(
+export const PROTOTYPE_ID = /^prototype-[0-9a-f-]{36}$/;
+function validTarget(x: z.infer<typeof sessionBaseSchema>): boolean {
+  if (x.platform === 'web') return isHttpUrlWithoutCredentials(x.target) && !x.native;
+  // Static designs have nothing to submit or scan; they only accept screen taps.
+  if (x.platform === 'prototype') return PROTOTYPE_ID.test(x.target) && !x.native && x.allowedCapabilities.length === 0 && !x.accessibilityChecks && x.interactionMode === 'standard';
+  return /^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+$/.test(x.target) && Boolean(x.native) && x.testEnvironment && x.allowedCapabilities.length === 0 && !x.accessibilityChecks && x.interactionMode === 'standard';
+}
+export const sessionInputSchema = sessionBaseSchema.refine(validTarget,
+  'Web requires an HTTP(S) URL without credentials. Native requires an app ID, a prepared test device, testEnvironment=true, no capability overrides, no axe scans and standard interaction. Prototype requires an imported prototype ID, no axe scans, standard interaction and no capability overrides.').refine(
   x => x.platform === 'web' || (!x.focus?.startPath && !x.focus?.includePaths.length),
-  'Native focus areas can have a name and description only; page paths cannot be tracked in native apps.').refine(
+  'Native app and prototype focus areas can have a name and description only; page paths cannot be tracked there.').refine(
   x => x.testEnvironment || x.allowedCapabilities.length === 0,
   'Capability overrides require testEnvironment: true',
 );
@@ -98,7 +103,7 @@ export const roundInputSchema = sessionBaseSchema.omit({ persona: true }).extend
   personas: z.array(personaSchema).min(1).max(5).optional(),
   participantCount: z.number().int().min(1).max(5).default(3),
   personaContext: z.string().min(1).max(2000).default('A first-time visitor pursuing the supplied goal'),
-}).refine(x => x.platform === 'web' && !x.native && isHttpUrlWithoutCredentials(x.target), 'Rounds currently support web targets only').refine(x => x.exercise === 'task', 'First-impression exercises are single sessions and are never pooled into rounds').refine(x => x.testEnvironment || x.allowedCapabilities.length === 0,
+}).refine(x => (x.platform === 'web' && !x.native && isHttpUrlWithoutCredentials(x.target)) || (x.platform === 'prototype' && PROTOTYPE_ID.test(x.target) && !x.accessibilityChecks && x.interactionMode === 'standard' && x.allowedCapabilities.length === 0), 'Rounds support web targets and imported prototypes (without axe scans)').refine(x => x.exercise === 'task', 'First-impression exercises are single sessions and are never pooled into rounds').refine(x => x.testEnvironment || x.allowedCapabilities.length === 0,
   'Capability overrides require testEnvironment: true')
   .refine(x => !x.personas || x.personas.length === x.participantCount,
     'personas length must equal participantCount');

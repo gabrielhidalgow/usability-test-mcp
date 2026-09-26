@@ -69,7 +69,7 @@ export function renderExecutiveMarkdown(report: UsabilityReport, directory: stri
   const selected = distinct.slice(0, 3);
   const lines = ['# Usability Test — Executive report', '',
     `**Task:** ${compact(report.goal, 220)}`, '',
-    `**Product:** ${compact(report.target, 160)} · **Date:** ${report.generatedAt.slice(0, 10)} · **Scope:** ${report.platform === 'native' ? 'native app (experimental)' : report.viewport === 'mobile' ? 'mobile web' : report.viewport === 'desktop' ? 'desktop web' : 'web (device unspecified)'} · ${outcomes.length} synthetic participant(s).`, '',
+    `**Product:** ${compact(report.target, 160)} · **Date:** ${report.generatedAt.slice(0, 10)} · **Scope:** ${report.platform === 'native' ? 'native app (experimental)' : report.platform === 'prototype' ? 'static design prototype (e.g. Figma frames)' : report.viewport === 'mobile' ? 'mobile web' : report.viewport === 'desktop' ? 'desktop web' : 'web (device unspecified)'} · ${outcomes.length} synthetic participant(s).`, '',
     `**Audience:** ${compact([...new Set(outcomes.map(s => s.persona.context))].join('; '), 180)}`, '',
     '**Evidence from synthetic participants, not human research.** Completion and findings are model judgments.', ''];
   if (report.sessions.some(s => s.provider.includes('test-double'))) lines.push('**DEMO / TEST DOUBLE — fixture verification, not AI usability research.**', '');
@@ -82,6 +82,7 @@ export function renderExecutiveMarkdown(report: UsabilityReport, directory: stri
     `- **Method:** ${quality.some(q => q.method === 'informed walkthrough') ? 'Includes informed walkthroughs' : 'Simulated journeys'}; no real participants.${report.methodologyVersion ? ` Reviewed with methodology ${report.methodologyVersion} (Krug, Weinschenk).` : ''}`,
     `- **Context:** ${contexts} (host-reported, not independently verified).${firstVisitSupported ? '' : ' First-visit conclusions are withheld.'}`,
     `- **Coverage gaps:** ${gaps.join('; ') || 'None recorded; this does not establish complete coverage.'}`,
+    ...(report.platform === 'prototype' ? [`- **Prototype:** ${prototypeSummaryLine(report)}`] : []),
     ...(report.focus ? [`- **Focus:** ${focusSummary(report)}`] : []),
     ...(report.baselineComparison ? [`- **Retest:** ${retestSummary(report.baselineComparison)}`] : []),
     `- **Corrections:** ${report.correction ? `Replaces an earlier attempt (${compact(report.correction.reason, 60)}). Earlier results are excluded; details are in the appendix.` : 'No replacement attempt recorded.'}`, '');
@@ -133,7 +134,7 @@ export function renderExecutiveMarkdown(report: UsabilityReport, directory: stri
   if (report.limitations.some(l => /did not settle|transient visual/i.test(l))) lines.push('Some screenshots did not settle. Recheck transient visual findings before changing the design.', '');
   const rules = new Set(report.accessibility.flatMap(scan => scan.findings.map(f => f.id)));
   const errors = report.accessibility.filter(scan => scan.error).length;
-  lines.push(report.accessibility.length ? `Automated accessibility: ${rules.size} distinct rule(s) flagged${errors ? `; ${errors} scan(s) failed` : ''}. This is not a WCAG conformance audit.` : 'Automated accessibility was not assessed.', '');
+  lines.push(report.platform === 'prototype' ? 'Accessibility not assessed: static images cannot be scanned.' : report.accessibility.length ? `Automated accessibility: ${rules.size} distinct rule(s) flagged${errors ? `; ${errors} scan(s) failed` : ''}. This is not a WCAG conformance audit.` : 'Automated accessibility was not assessed.', '');
   if (comparison) {
     const shared = comparison.participants.some(p => p.contextIsolation === 'shared');
     const unknown = comparison.participants.some(p => p.contextIsolation === 'unknown');
@@ -151,6 +152,18 @@ export function isOutsideFocusOnly(report: UsabilityReport, finding: UsabilityRe
   if (!report.focus?.includePaths.length) return false;
   const steps = finding.evidence.flatMap(e => e.stepNumbers.map(n => report.journeys.find(j => j.sessionId === e.sessionId)?.steps.find(s => s.step === n)));
   return steps.length > 0 && steps.every(s => s?.focus === 'outside');
+}
+export function prototypeTaps(report: UsabilityReport) {
+  const taps = report.journeys.flatMap(j => j.steps.map(s => s.result.prototype && { ...s.result.prototype, key: `${j.sessionId}:${s.result.prototype.screenId}` })).filter(t => t !== undefined);
+  // Each scored screen counts once per participant, by its first tap: right first time, or not.
+  const firstTap = new Map<string, 'hit' | 'miss'>();
+  for (const t of taps) if (t.target !== 'unscored' && !firstTap.has(t.key)) firstTap.set(t.key, t.target);
+  return { firstTapHits: [...firstTap.values()].filter(v => v === 'hit').length, scored: firstTap.size,
+    misclicks: taps.filter(t => t.target === 'miss').length, movedOn: taps.filter(t => t.movedOn).length, unscored: taps.filter(t => t.target === 'unscored').length };
+}
+function prototypeSummaryLine(report: UsabilityReport): string {
+  const t = prototypeTaps(report);
+  return `${t.scored ? `first tap on target on ${t.firstTapHits} of ${t.scored} scored screen visit(s); ${t.misclicks} misclick(s)${t.movedOn ? `; facilitator moved on ${t.movedOn} time(s)` : ''}` : 'no scored screens'}${t.unscored ? `; ${t.unscored} unscored tap(s) judged by the evaluator` : ''}. Static screens: no hover, loading, typing or scrolling.`;
 }
 function focusSummary(report: UsabilityReport): string {
   const focus = report.focus!;

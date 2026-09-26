@@ -36,7 +36,7 @@ export class Discoveries {
     await this.recorder.json(join(this.directory(id), 'discovery.json'), record);
     return record;
   }
-  async verifyHandoff(input: SessionInput | { target: string; platform: 'web' | 'native'; handoff?: SessionInput['handoff'] }) {
+  async verifyHandoff(input: SessionInput | { target: string; platform: 'web' | 'native' | 'prototype'; handoff?: SessionInput['handoff'] }) {
     if (!input.handoff) {
       let ids: string[] = [];
       try { ids = await readdir(join(this.root, 'discoveries')); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }

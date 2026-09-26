@@ -27,6 +27,7 @@ export function renderDetailedMarkdown(report: UsabilityReport, directory: strin
   const lines = ['# Usability Test — Evidence appendix', '', '[Back to executive report](report.md)', '', report.disclaimer, '', '## Test setup', '',
     `Product: ${escape(report.target)}`, '', `Platform: ${report.platform ?? 'web'}`, '', `Date: ${report.generatedAt}`, '',
     `Scenario: ${escape(report.scenario)}`, '', `Goal: ${escape(report.goal)}`, '',
+    ...(report.platform === 'prototype' ? [`Prototype: ${escape(report.target)} (static design screens; source and screen order are in the prototype store). Targets and frame names were not shown to participants.`, ''] : []),
     ...(report.focus ? [`Focus area: ${escape(report.focus.name)}${report.focus.description ? ` — ${escape(report.focus.description)}` : ''}. Start page: ${escape(report.focus.startPath ?? 'product URL')}. In scope: ${report.focus.includePaths.map(escape).join(', ') || 'not tracked'}. A journey ends after ${report.focus.leaveLimit} consecutive steps outside. Participants were not told the boundary.`, ''] : []),
     '## Executive summary', '',
     `${report.sessions.length} synthetic session(s); ${report.sessions.filter(s => s.status === 'completed').length} reported completion; ${report.findings.length} evidence-linked usability finding(s).`, '',
@@ -112,6 +113,7 @@ export function renderDetailedMarkdown(report: UsabilityReport, directory: strin
     for (const step of journey.steps) {
       lines.push(`- Step ${step.step}${step.focus === 'outside' ? ' (outside focus)' : ''}: **${escape(describeAction(step))}** — ${escape(step.result.message)}. ${link(step.before.screenshot.path)}${step.after ? ` → ${link(step.after.screenshot.path)}` : ''}`,
         `  Simulated commentary: ${escape(step.decision.simulatedCommentary)}`);
+      if (step.result.prototype) lines.push(`  Prototype tap: ${step.result.prototype.target === 'hit' ? 'on the marked target' : step.result.prototype.target === 'miss' ? `missed the marked target${step.result.prototype.movedOn ? '; facilitator moved on' : ''}` : 'unscored (no marked target)'} on screen ${escape(step.result.prototype.screenId)}.`);
       if (step.decision.userExpectation) lines.push(`  Expected: ${escape(step.decision.userExpectation)} → Result: ${step.after ? `${escape(step.after.title)} (${escape(step.after.location)})` : 'no resulting screen recorded'}`);
     }
     lines.push('');

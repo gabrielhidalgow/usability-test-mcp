@@ -62,3 +62,7 @@ Each principle says what evidence to look for, what counts against it, and its l
 ## Focus areas
 
 A test can focus on one feature, page or flow (Krug: test a few key tasks, starting where they matter). The participant starts on the focus page and is **never told the boundary**, since that would be coaching. Steps are marked inside or outside the focus; after three consecutive steps outside, the journey ends as “left the focus area”, which is itself evidence. Reports keep actions on the focus area and list outside-only findings separately.
+
+## Static design flows (Figma)
+
+The same principles apply to static frames, with a narrower lens. Tap accuracy on a marked target is evidence for `self-evident` and `mindless-choices`; misclicks and facilitator move-ons are recorded obstacles. Expectation-versus-next-frame is evidence for `expectation-match` and `mental-models`. Content, grouping, hierarchy and choice principles read directly from the frames. Principles that depend on live behaviour (`feedback` timing, `error-recovery`, `motion-distraction`) can only be judged from what the frames show, and usually end as not-encountered or inconclusive.

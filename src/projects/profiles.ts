@@ -2,7 +2,7 @@ import { mkdir, readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { discoveryIdSchema, focusSchema, focusStartUrl, personaSchema, sessionBaseSchema, sessionInputSchema, roundInputSchema, isHttpUrlWithoutCredentials } from '../config/schema.js';
+import { discoveryIdSchema, focusSchema, focusStartUrl, PROTOTYPE_ID, personaSchema, sessionBaseSchema, sessionInputSchema, roundInputSchema, isHttpUrlWithoutCredentials } from '../config/schema.js';
 import { EvidenceRecorder } from '../evidence/recorder.js';
 
 const answer = z.string().trim().min(1).max(2000);
@@ -19,7 +19,7 @@ export const questions = {
 export const planSchema = z.strictObject({
   name: z.string().trim().min(1).max(120),
   target: z.string().min(1).max(4000),
-  platform: z.enum(['web', 'native']).optional(),
+  platform: z.enum(['web', 'native', 'prototype']).optional(),
   native: sessionBaseSchema.shape.native,
   discoveryId: discoveryIdSchema.optional(),
   answers: intakeSchema,
@@ -32,7 +32,7 @@ export const planSchema = z.strictObject({
     scenario: answer, goal: answer,
     successCriteria: z.array(answer).min(1).max(10),
   })).min(1).max(5),
-}).refine(p => p.platform === 'native' ? /^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+$/.test(p.target) && Boolean(p.native) : isHttpUrlWithoutCredentials(p.target) && !p.native, 'Supply a web URL or a native app ID with prepared-device configuration').refine(p => new Set(p.journeys.map(j => j.id)).size === p.journeys.length, 'Journey IDs must be unique').refine(p => {
+}).refine(p => p.platform === 'native' ? /^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+$/.test(p.target) && Boolean(p.native) : p.platform === 'prototype' ? PROTOTYPE_ID.test(p.target) && !p.native : isHttpUrlWithoutCredentials(p.target) && !p.native, 'Supply a web URL, a native app ID with prepared-device configuration, or an imported prototype ID').refine(p => new Set(p.journeys.map(j => j.id)).size === p.journeys.length, 'Journey IDs must be unique').refine(p => {
   const ids = p.personas.map(persona => persona.id).filter(id => id !== undefined);
   return new Set(ids).size === ids.length && p.journeys.every(j => !j.personaIds ||
     new Set(j.personaIds).size === j.personaIds.length && j.personaIds.every(id => ids.includes(id)));
@@ -40,8 +40,8 @@ export const planSchema = z.strictObject({
   const ids = (p.focusAreas ?? []).map(f => f.id);
   return new Set(ids).size === ids.length && p.journeys.every(j => !j.focusAreaId || ids.includes(j.focusAreaId));
 }, 'Focus area IDs must be unique and each journey focusAreaId must reference a saved focus area').refine(
-  p => p.platform !== 'native' || (p.focusAreas ?? []).every(f => !f.startPath && !f.includePaths.length),
-  'Native focus areas can have a name and description only');
+  p => (p.platform ?? 'web') === 'web' || (p.focusAreas ?? []).every(f => !f.startPath && !f.includePaths.length),
+  'Native app and prototype focus areas can have a name and description only');
 const profileSchema = z.strictObject({ id: projectIdSchema, createdAt: z.string(), approvedAt: z.string().nullable(), plan: planSchema });
 export type ProjectProfile = z.infer<typeof profileSchema>;
 
@@ -92,8 +92,9 @@ export function projectRun(profile: ProjectProfile, journeyId: string, participa
   const assignment = { journeyId, focusArea: journey.focusAreaId, participants: selected.map(p => ({ id: p.id, name: p.name })) };
   // One focus area per journey. Participants start on its page but never see its boundary.
   const focus = journey.focusAreaId ? profile.plan.focusAreas?.find(f => f.id === journey.focusAreaId) : undefined;
-  const task = { ...settings, ...(profile.plan.platform === 'native' ? { platform: 'native', native: profile.plan.native, testEnvironment: true, accessibilityChecks: false } : {}),
-    ...(focus ? { focus } : {}), target: profile.plan.platform === 'native' ? profile.plan.target : focusStartUrl(profile.plan.target, focus), scenario: journey.scenario, goal: journey.goal };
+  const platform = profile.plan.platform ?? 'web';
+  const task = { ...settings, ...(platform === 'native' ? { platform: 'native', native: profile.plan.native, testEnvironment: true, accessibilityChecks: false } : platform === 'prototype' ? { platform: 'prototype', accessibilityChecks: false, interactionMode: 'standard' } : {}),
+    ...(focus ? { focus } : {}), target: platform === 'web' ? focusStartUrl(profile.plan.target, focus) : profile.plan.target, scenario: journey.scenario, goal: journey.goal };
   return participantCount === 1
     ? { kind: 'session' as const, assignment, input: sessionInputSchema.parse({ ...task, persona: selected[0] }) }
     : { kind: 'round' as const, assignment, input: roundInputSchema.parse({ ...task, participantCount, personas: selected }) };

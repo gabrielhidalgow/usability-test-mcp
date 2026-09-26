@@ -1,8 +1,10 @@
 import type { SessionInput } from '../config/schema.js';
 import type { UsabilityReport } from './types.js';
 
-export function assertParticipantContext(input: Pick<SessionInput, 'contextCheck' | 'handoff'>) {
+export function assertParticipantContext(input: Pick<SessionInput, 'contextCheck' | 'handoff'> & { platform?: SessionInput['platform'] }) {
   const check = input.contextCheck;
+  // Whoever imported a prototype has seen every frame and target, so the run must declare its context.
+  if (input.platform === 'prototype' && !check) throw new Error('Prototype tests require contextCheck. Run the participant in a fresh chat or agent that has not seen the frames (mode first-visit, isolation host-reported fresh), or declare an informed-walkthrough.');
   if (!check) return; // Older clients remain usable, with unverified first-visit conclusions withheld.
   if (check.mode === 'first-visit' && (check.isolation !== 'host-reported fresh' || check.exposure.length)) {
     throw new Error('First-visit testing requires a clean participant context with no source-code, discovery, prior-findings or prior-journey exposure. Start a fresh chat/agent with only the neutral task and profile. Alternatively explicitly choose informed-walkthrough; its results cannot support first-visit conclusions. Freshness is host-reported, not verified.');

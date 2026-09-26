@@ -49,7 +49,17 @@ export class RunComparisons {
     const retest = await this.load(retestId, 'retest');
     // A correction replaces an invalid attempt; it is not evidence about a product change.
     if (retest.correction?.priorRunId === baselineId || baseline.correction?.priorRunId === retestId) throw new RunComparisonError('These runs are a correction pair (one supersedes the other), not a baseline and retest.');
-    return { baseline, retest, mismatches: mismatches(baseline, retest) };
+    const differences = mismatches(baseline, retest);
+    if (baseline.platform === 'prototype' && retest.platform === 'prototype') {
+      // Each import gets a new ID; the same flow re-imported after design edits is still comparable.
+      const read = async (id: string) => { try { return JSON.parse(await readFile(join(this.recorder.root, 'prototypes', id, 'prototype.json'), 'utf8')) as { name: string; screens: unknown[] }; } catch { return undefined; } };
+      const [a, b] = [await read(baseline.target), await read(retest.target)];
+      const index = differences.indexOf('different product origin');
+      if (index >= 0 && a && b && a.name === b.name) differences.splice(index, 1);
+      else if (index >= 0) differences[index] = 'different design flow';
+      if (a && b && a.screens.length !== b.screens.length) differences.push(`screen count ${a.screens.length} vs ${b.screens.length}`);
+    }
+    return { baseline, retest, mismatches: differences };
   }
   async inputs(baselineId: string, retestId: string) {
     const { baseline, retest, mismatches: differences } = await this.pair(baselineId, retestId);

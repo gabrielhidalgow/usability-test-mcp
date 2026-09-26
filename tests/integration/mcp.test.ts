@@ -94,7 +94,7 @@ test('ordinary host tool calls drive three isolated participants, return images 
     assert(report.limitations.some((l: string) => l.includes('cannot guarantee model-context isolation')));
     const saved = await client.callTool({ name: 'usability_get_report', arguments: { id: final.runId, format: 'markdown' } });
     assert.match((saved.content as { text: string }[])[0]!.text, /synthetic participants/);
-    assert.equal((await client.listPrompts()).prompts.length, 3);
+    assert.equal((await client.listPrompts()).prompts.length, 4);
     const prompt = await client.getPrompt({ name: 'run-usability-test', arguments: { target: fixture.url } });
     assert.match((prompt.messages[0]!.content as { text: string }).text, /Do not prescribe clicks/);
     const invalid = await client.callTool({ name: 'usability_get_report', arguments: { id: '../../.env' } });

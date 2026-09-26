@@ -6,7 +6,7 @@ export class BrowserWindowClosed extends Error {}
 export type ViewStatus = { participant: string; step: number; phase: 'waiting' | 'planned' | 'executing' | 'completed' | 'finished'; action?: string };
 export type DriverStartConfig = { onWindowClosed?: () => void; input: SessionInput; directory: string; signal: AbortSignal };
 export interface ProductDriver {
-  readonly kind: 'web' | 'mobile';
+  readonly kind: 'web' | 'mobile' | 'prototype';
   readonly limitations?: string[];
   setViewStatus?(status: ViewStatus): Promise<void>;
   tapPoint?(x: number, y: number): Promise<ActionResult>;

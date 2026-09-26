@@ -29,6 +29,8 @@ export function guardAction(action: Action, observation: ProductObservation, inp
   // First-impression exercises follow Krug's home-page tour: look and scroll, but do not click.
   if (input.exercise === 'first-impression' && action.type !== 'finish' && action.type !== 'scroll') return 'First-impression exercises allow scrolling and finishing only; do not navigate or interact.';
   if (action.type === 'finish' || action.type === 'back' || action.type === 'scroll') return null;
+  // A static design cannot submit, pay or delete anything, so screen taps need no capability opt-in.
+  if (input.platform === 'prototype') return action.type === 'tap_point' || action.type === 'enter_text' ? null : 'Static designs accept tap_point (and described text) only.';
   if (input.interactionMode === 'keyboard' && (action.type === 'click' || action.type === 'tap')) {
     return 'Keyboard sessions cannot click or tap.';
   }

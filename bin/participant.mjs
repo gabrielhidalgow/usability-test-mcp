@@ -92,7 +92,9 @@ async function isolationDir(host, artifacts, serverPath) {
     if (existsSync(auth)) await symlink(auth, join(home, 'auth.json'));
     const toml = s => JSON.stringify(s);
     await writeFile(join(home, 'config.toml'), [`approval_policy = "never"`, `[mcp_servers.usability]`, `command = ${toml(server.command)}`, `args = [${server.args.map(toml).join(', ')}]`,
-      `env = { ${Object.entries(env).map(([k, v]) => `${k} = ${toml(v)}`).join(', ')} }`, ''].join('\n'), { mode: 0o600 });
+      `env = { ${Object.entries(env).map(([k, v]) => `${k} = ${toml(v)}`).join(', ')} }`,
+      // Headless exec cancels MCP calls that need approval; pre-approve only this server's tools.
+      `default_tools_approval_mode = "approve"`, ''].join('\n'), { mode: 0o600 });
   }
   return { root, work };
 }

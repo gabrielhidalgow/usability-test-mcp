@@ -25,6 +25,7 @@ if (codex) {
   const toml = readFileSync(join(process.env.CODEX_HOME, 'config.toml'), 'utf8');
   const servers = [...toml.matchAll(/^\[mcp_servers\.([^\]]+)\]/gm)].map(m => m[1]);
   if (servers.join() !== 'usability') throw new Error(`Unexpected MCP servers: ${servers}`);
+  if (!/^default_tools_approval_mode = "approve"$/m.test(toml)) throw new Error('Codex would cancel MCP calls without approval mode');
   server = { command: JSON.parse(/^command = (.*)$/m.exec(toml)[1]), args: JSON.parse(/^args = (.*)$/m.exec(toml)[1]),
     env: Object.fromEntries([.../^env = \{(.*)\}$/m.exec(toml)[1].matchAll(/(\w+) = ("[^"]*")/g)].map(m => [m[1], JSON.parse(m[2])])) };
 } else server = JSON.parse(readFileSync(args[args.indexOf('--mcp-config') + 1], 'utf8')).mcpServers.usability;

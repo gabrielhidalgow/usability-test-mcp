@@ -45,11 +45,17 @@ export async function registerClaudeCode(entry) {
 export async function main(args) {
   const [command, ...flags] = args;
   if (!command || command === '--help' || command === 'help') {
-    console.log('Usability Test MCP\n  setup --host codex|claude-code|claude-desktop|manual [--dir ABSOLUTE_PATH]\n  doctor [--native]\n  serve\n\nRequires Node 22+ and npm. Automated setup: macOS; Codex/Claude Code/manual also Linux.\nSetup installs a durable runtime and Chromium. Restart the host afterward.');
+    console.log('Usability Test MCP\n  setup --host codex|claude-code|claude-desktop|manual [--dir ABSOLUTE_PATH]\n  doctor [--native]\n  serve\n  participant --host claude|codex --start JSON [--check] [--terms Name,domain]\n\nRequires Node 22+ and npm. Automated setup: macOS; Codex/Claude Code/manual also Linux.\nSetup installs a durable runtime and Chromium. Restart the host afterward.');
     return;
   }
   if (Number(process.versions.node.split('.')[0]) < 22) throw new Error('Node.js 22 or newer is required.');
   if (command === 'serve' && !flags.length) { await import('../dist/src/index.js'); return; }
+  if (command === 'participant') {
+    const { participantMain, ParticipantError } = await import('./participant.mjs');
+    try { console.log(JSON.stringify(await participantMain(flags), null, 2)); }
+    catch (error) { if (error instanceof ParticipantError) { console.log(JSON.stringify({ ok: false, code: error.code, error: error.message }, null, 2)); process.exitCode = error.code; return; } throw error; }
+    return;
+  }
   if (command === 'doctor' && flags.length === 1 && flags[0] === '--native') {
     run('maestro', ['--version']);
     run('maestro', ['list-devices']);

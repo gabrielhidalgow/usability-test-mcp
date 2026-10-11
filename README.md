@@ -110,6 +110,26 @@ Recommendations may include optional `suggestedChange` fields: `kind` (`copy`, `
 
 Long fields are shortened in the executive view and retained fully in the appendix. Raw participant IDs, full commentary and technical diagnostics stay in the appendix. See [the reusable report outline](docs/REPORT_TEMPLATE.md).
 
+## Clean participants (isolated headless runner)
+
+A participant that runs inside your project chat, or as a subagent of it, inherits the project's CLAUDE.md/AGENTS.md, its memory, every connected MCP (CMS, analytics…) and messages from other chats. That knowledge leaks into "first-visit" behaviour. The runner starts each participant as **its own headless process** instead, for every target type (live site, localhost, Figma prototype, native app):
+
+```bash
+usability-test-mcp participant --host claude --check --start '{"tool":"usability_quick_test","arguments":{"target":"https://example.com","goal":"Find the monthly price"}}'
+usability-test-mcp participant --host claude --start '{"tool":"usability_quick_test","arguments":{"target":"https://example.com","goal":"Find the monthly price"}}'
+```
+
+(Use the installed copy: `node ~/.local/share/usability-mcp/runtime/node_modules/usability-test-mcp/bin/usability-test-mcp.mjs participant …`. The MCP prompts print the exact command.)
+
+- **Claude Code:** `claude -p` from an empty temporary folder, `--setting-sources user`, `--strict-mcp-config` with only the usability MCP, file, web, agent, skill and messaging tools disallowed, no session persistence. `--bare` is not used because it requires an API key rather than your subscription.
+- **Codex:** `codex exec` from an empty folder with a private `CODEX_HOME` that holds only a link to your login and the usability MCP (no other servers, plugins, memories or global AGENTS.md), read-only sandbox, stdin closed.
+- **Preflight:** a one-line call first. If the CLI login has expired it stops with “run `claude /login`” (or `codex login`) before anything starts. The headless CLI login is separate from the desktop app.
+- **Canary:** the isolated participant is asked whether its instructions, memory, files or tool descriptions mention the product under test (terms derived from the URL, prototype or plan name, plus `--terms`) or contain project material. Anything but empty lists stops the run and names the source; nothing is started. A canary is a self-report: it reduces, but cannot prove the absence of, prior knowledge. General training knowledge of well-known brands is not checked.
+- **One at a time:** a lock file (`<artifacts>/active-run.json`) refuses a second concurrent participant; stale locks from dead processes are cleaned.
+- **Exact IDs:** the start JSON carries the IDs created in your chat; the runner forces one participant and a first-visit context declaration, and never edits the plan.
+- **No self-evaluation:** the participant submits no findings. Evaluate in your chat with `usability_review_session` (single session) or run the participant several times and call `usability_combine_sessions` to get a normal comparison round with its review stages. Reports state “each participant ran as its own headless process … and passed a product-knowledge check”.
+- If isolation is impossible, run an informed walkthrough in the chat and label it; the runner only runs first-visit tests.
+
 ## One MCP, four kinds of target
 
 The same install, questionnaire, participants, methodology and reports work for every target; only the target changes.
@@ -319,6 +339,8 @@ For a keyboard journey, ask for `usability_run_accessibility` with the same pers
 | `usability_get_report` | Read JSON, Markdown, or journey by session/round ID |
 | `usability_import_prototype` | Import static design frames (e.g. a Figma section) and optional tap targets |
 | `usability_test_prototype` | Test an imported static design flow with one or more participants |
+| `usability_review_session` | Coordinator findings for a finished isolated session |
+| `usability_combine_sessions` | Turn 2–5 isolated sessions of one task into a comparison round |
 | `usability_compare_runs` | Prepare a baseline → retest comparison of two saved runs of the same task |
 | `usability_submit_run_comparison` | Save validated observed-again / not-observed-on-comparable-path / inconclusive assessments |
 

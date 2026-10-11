@@ -18,7 +18,9 @@ export function contextQuality(report: UsabilityReport, session: UsabilityReport
   const check = session.contextCheck;
   const contaminated = Boolean(check?.exposure.length) || check?.mode === 'informed-walkthrough' || check?.isolation === 'shared' || declarations.includes('shared');
   const fresh = !contaminated && declarations[0] === 'host-reported fresh' && (!check || check.isolation === 'host-reported fresh');
-  return { isolation: contaminated ? 'shared' : fresh ? 'host-reported fresh' : 'unknown',
-    method: contaminated ? 'informed walkthrough' : fresh ? 'fresh-context simulation' : 'context-unverified simulation',
+  // A participant run as its own headless process, with a passing product-knowledge canary, is the strongest isolation available.
+  const isolated = fresh && (session.isolatedProcess === true || (report.sessions.length === 1 && Boolean(report.participantRun?.completed && report.participantRun.canary.passed)));
+  return { isolation: contaminated ? 'shared' : isolated ? 'isolated headless process' : fresh ? 'host-reported fresh' : 'unknown',
+    method: contaminated ? 'informed walkthrough' : isolated ? 'isolated-process simulation' : fresh ? 'fresh-context simulation' : 'context-unverified simulation',
     firstVisitSupported: fresh };
 }

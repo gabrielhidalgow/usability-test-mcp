@@ -1,6 +1,6 @@
 {
   "name": "usability-test-mcp",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "private": true,
   "description": "Local-first synthetic usability testing over MCP",
   "type": "module",
@@ -16,7 +16,7 @@
     "test:unit": "tsx --test tests/unit/*.test.ts",
     "fixture": "tsx tests/fixtures/serve.ts",
     "demo": "tsx examples/demo.ts",
-    "check": "npm run typecheck && npm test && npm run test:installer && npm run build",
+    "check": "npm run typecheck && npm test && npm run build && npm run test:installer",
     "prepare": "npm run build",
     "test:installer": "node --test tests/installer/*.test.mjs"
   },

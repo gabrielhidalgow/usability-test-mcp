@@ -41,7 +41,7 @@ type Pattern = z.infer<typeof pattern> & { id: string; participantCount: number;
 export type Comparison = {
   revision: number; nextStage: 'participants' | 'synthesis' | 'ux' | 'content' | 'complete';
   participants: { participantId: string; sessionIds: string[]; name: string;
-    basis: string; contextIsolation: 'shared' | 'host-reported fresh' | 'unknown' }[];
+    basis: string; contextIsolation: 'shared' | 'host-reported fresh' | 'isolated headless process' | 'unknown' }[];
   patterns: Pattern[]; ungroupedFindingIds: string[];
   reviews: { ux: ExpertReview; content: ExpertReview };
   lastSubmission?: string;

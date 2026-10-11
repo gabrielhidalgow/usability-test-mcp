@@ -103,7 +103,9 @@ export type UsabilityReport = {
   baselineComparison?: import('./run-comparison.js').BaselineComparison;
   platform?: 'web' | 'native' | 'prototype'; viewport?: 'desktop' | 'mobile'; target: string; scenario: string; goal: string; disclaimer: string;
   sessions: { id: string; persona: Persona; status: SessionStatus; reason: string;
-    continuation?: Continuation; presentation?: 'visible' | 'background'; handoff?: SessionInput['handoff']; contextCheck?: SessionInput['contextCheck']; focusExit?: boolean; actions: number; wrongTurns: number; backtracks: number; provider: string }[];
+    continuation?: Continuation; presentation?: 'visible' | 'background'; handoff?: SessionInput['handoff']; contextCheck?: SessionInput['contextCheck']; focusExit?: boolean; isolatedProcess?: boolean; actions: number; wrongTurns: number; backtracks: number; provider: string }[];
+  participantRun?: { isolation: 'headless-process'; host: 'claude' | 'codex'; method: string; canary: { terms: string[]; passed: boolean }; startedAt: string; finishedAt: string; firstDecisionContext: string | null; completed: boolean };
+  evaluation?: { by: 'coordinator'; recordedAt: string };
   correction?: { priorRunId: string; reason: string; changes: string; recordedAt: string; changedFields: string[] };
   supersededBy?: string;
   comparison?: import('./comparison.js').Comparison;

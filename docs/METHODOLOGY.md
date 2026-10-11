@@ -66,3 +66,7 @@ A test can focus on one feature, page or flow (Krug: test a few key tasks, start
 ## Static design flows (Figma)
 
 The same principles apply to static frames, with a narrower lens. Tap accuracy on a marked target is evidence for `self-evident` and `mindless-choices`; misclicks and facilitator move-ons are recorded obstacles. Expectation-versus-next-frame is evidence for `expectation-match` and `mental-models`. Content, grouping, hierarchy and choice principles read directly from the frames. Principles that depend on live behaviour (`feedback` timing, `error-recovery`, `motion-distraction`) can only be judged from what the frames show, and usually end as not-encountered or inconclusive.
+
+## Neutral facilitation in practice: isolated participants
+
+Krug's facilitator gives the participant nothing beyond the task. For an AI participant the equivalent is its context: project files, memory, other tools and earlier conversations all act as hints. The participant runner gives each participant its own headless process with only the usability tools, checks for product knowledge before starting (a self-reported canary, not proof), and keeps evaluation, where project knowledge is useful, in the coordinating chat.

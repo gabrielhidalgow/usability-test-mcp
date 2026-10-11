@@ -80,7 +80,7 @@ export function renderExecutiveMarkdown(report: UsabilityReport, directory: stri
     /\b(pdf|download|data\s?sheet)\b/i.test(`${report.goal} ${report.scenario}`) ? 'PDF/download completion is unsupported' : ''].filter(Boolean);
   lines.push('## How to interpret this test', '',
     `- **Method:** ${quality.some(q => q.method === 'informed walkthrough') ? 'Includes informed walkthroughs' : 'Simulated journeys'}; no real participants.${report.methodologyVersion ? ` Reviewed with methodology ${report.methodologyVersion} (Krug, Weinschenk).` : ''}`,
-    `- **Context:** ${contexts} (host-reported, not independently verified).${firstVisitSupported ? '' : ' First-visit conclusions are withheld.'}`,
+    `- **Context:** ${quality.length && quality.every(q => q.isolation === 'isolated headless process') ? 'each participant ran as its own headless process with no project files, memory or other tools, and passed a product-knowledge check' : `${contexts} (host-reported, not independently verified)`}.${firstVisitSupported ? '' : ' First-visit conclusions are withheld.'}`,
     `- **Coverage gaps:** ${gaps.join('; ') || 'None recorded; this does not establish complete coverage.'}`,
     ...(report.platform === 'prototype' ? [`- **Prototype:** ${prototypeSummaryLine(report)}`] : []),
     ...(report.focus ? [`- **Focus:** ${focusSummary(report)}`] : []),
@@ -139,8 +139,9 @@ export function renderExecutiveMarkdown(report: UsabilityReport, directory: stri
     const shared = comparison.participants.some(p => p.contextIsolation === 'shared');
     const unknown = comparison.participants.some(p => p.contextIsolation === 'unknown');
     const assumptions = comparison.participants.filter(p => p.basis !== 'owner-research').length;
-    lines.push(`Profiles: ${assumptions} assumption-based or unspecified. Model context: ${shared ? 'shared context reported' : unknown ? 'isolation unknown' : 'fresh contexts reported by host, not independently verified'}. Shared-model bias can recur.`, '');
-  } else lines.push('Model-context isolation is not independently verified. Profile assumptions and full limitations are in the appendix.', '');
+    const isolatedAll = comparison.participants.every(p => p.contextIsolation === 'isolated headless process');
+    lines.push(`Profiles: ${assumptions} assumption-based or unspecified. Model context: ${shared ? 'shared context reported' : unknown ? 'isolation unknown' : isolatedAll ? 'separate headless process per participant' : 'fresh contexts reported by host, not independently verified'}. Shared-model bias can recur.`, '');
+  } else lines.push(report.participantRun?.completed ? `Participant isolation: ${report.participantRun.host} headless process; the canary is a self-report, so it reduces but cannot prove the absence of prior knowledge. Profile assumptions and full limitations are in the appendix.` : 'Model-context isolation is not independently verified. Profile assumptions and full limitations are in the appendix.', '');
   lines.push('**Next check:** Retest the same task and profiles after changes; compare evidence, including successful paths. Validate important findings with real users. Proposed wording and design changes are hypotheses, not proven improvements.', '',
     '[Full evidence, journeys, UX/content reviews and limitations](details.md) · [Structured report](report.json)', '',
     'Long fields may be shortened with “…”; the appendix retains complete wording.', '');

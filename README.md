@@ -141,19 +141,17 @@ The same install, questionnaire, participants, methodology and reports work for 
 | **Figma flow** | Import the frames with `usability_import_prototype`, then `usability_test_prototype` | Static screens; see below. |
 | **Native app** (experimental) | `usability_run_native` on a prepared simulator/emulator | Needs Maestro and Java. |
 
-## Test a Figma flow
+## Test a Figma flow from a plain link
 
-Designs laid out as static frames, left to right in a section, can be tested without prototype links. Ask Claude, with your Figma MCP or CLI connected:
+Paste any Figma design link: a **section** (one flow), a **page** or a **whole file** (the tool lists the sections; test one, several or all, each as its own flow). Lay a flow's screens out in a section, left to right (more rows run top to bottom). To score taps, name the element that should be tapped on each screen with a layer starting `@tap` (it can be an invisible rectangle). Unmarked steps are recorded and judged afterwards.
 
-> Set up a usability test for the Figma flow at https://www.figma.com/design/…?node-id=… The user is a first-time small business owner trying to start on a plan.
+> Test this Figma flow: https://www.figma.com/design/…?node-id=… The user is a first-time small business owner trying to start on a plan.
 
-The `test-figma-flow` prompt walks the host through it:
+**With the official Figma MCP (default, no token):** the chat calls `get_metadata` once and `usability_plan_figma_flow` orders the screens and reads the `@tap` layers deterministically. It then makes **one** `get_screenshot` of the whole section, and `usability_import_figma_section` crops each screen locally and scales the targets. That is two Figma calls per flow, which matters on free plans: Figma's MCP allows Starter plans and View/Collab seats about 20 calls a month, and Dev/Full seats on paid plans about 200 a day ([Figma limits](https://developers.figma.com/docs/figma-mcp-server/rate-limits-access/)). The Figma MCP can only open files you can view **and** that belong to a plan you are in.
 
-1. **Export.** Claude lists the section's frames left to right, confirms the order with you, exports each as a PNG, and collects only visible text.
-2. **Targets (optional).** Mark the element that leads to the next frame (for example a layer named `@tap…`, or an annotation), or let Claude propose targets for you to approve. Steps without a target are **unscored**: the participant's tap is recorded and the evaluator judges whether it made sense for the flow.
-3. **Import.** `usability_import_prototype` stores the frames and targets. Images can be absolute file paths, https or localhost asset URLs, or base64.
-4. **Test in a fresh context.** The importing chat has seen every frame, so the participant runs in a fresh chat or agent (`contextCheck` is required). The participant sees one frame at a time and taps a point on the image with a label. A tap on a marked target shows the next frame; anywhere else shows nothing (a misclick), and after three misclicks the facilitator moves on. Unmarked steps always advance. `back` returns to the previous frame. Frame names, screen counts and targets are never shown to participants.
-5. **Report.** The usual executive report adds a **Prototype** line: first tap on target per scored screen, misclicks, move-ons and unscored taps. Three participants, project plans (`platform: "prototype"`, `target: <prototypeId>`), first-impression exercises and baseline→retest comparisons all work; a flow re-imported after design edits stays comparable when its name matches.
+**Fallback for any plan and any file you can view (no API):** when the Figma MCP is missing, refuses the file or hits its limit, select the section in Figma → **Export → PNG** (duplicate Community files first) and give the path, or export each frame into a folder. `usability_import_figma_export` detects the screens in a section image (or proposes the folder's file order) for you to confirm, then imports them. With exported images, `@tap` targets need the metadata; otherwise steps are unscored or targets are proposed for your approval.
+
+Participants then run isolated as for websites: one frame at a time, a tap on the marked target shows the next frame, anywhere else is a misclick (three and the facilitator moves on), `back` returns. Frame names, screen counts and targets are never shown to participants. Reports add a **Prototype** line (first tap on target per screen, misclicks, move-ons).
 
 **Limits:** static frames have no hover, loading, typing or in-frame scrolling, and may hold placeholder content. The flow is linear (one path in section order). An AI reading images judges how clear the screens and their order are, not interaction polish. No automated accessibility scan is possible on images.
 
@@ -337,6 +335,9 @@ For a keyboard journey, ask for `usability_run_accessibility` with the same pers
 | `usability_get_review` | Read the next saved review stage or inspect evidence screenshots |
 | `usability_submit_review` | Validate and save participant interpretations, patterns, UX or content reviews |
 | `usability_get_report` | Read JSON, Markdown, or journey by session/round ID |
+| `usability_plan_figma_flow` | Order a Figma section's screens and read `@tap` targets from a plain link + `get_metadata` |
+| `usability_import_figma_section` | Import a planned flow from one section render (crops locally) |
+| `usability_import_figma_export` | Import a section PNG or a folder of frames exported from Figma (no API) |
 | `usability_import_prototype` | Import static design frames (e.g. a Figma section) and optional tap targets |
 | `usability_test_prototype` | Test an imported static design flow with one or more participants |
 | `usability_review_session` | Coordinator findings for a finished isolated session |

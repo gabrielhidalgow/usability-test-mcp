@@ -9,7 +9,7 @@ const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const screenIdSchema = z.string().regex(/^[A-Za-z0-9_.:-]{1,80}$/);
 
 // Images come from whatever Figma access the host has: an exported file, an asset URL, or inline data.
-const imageSourceSchema = z.union([
+export const imageSourceSchema = z.union([
   z.strictObject({ path: z.string().min(1).refine(isAbsolute, 'Use an absolute file path') }),
   z.strictObject({ url: z.url() }),
   z.strictObject({ base64: z.string().min(16) }),
@@ -43,7 +43,7 @@ export function pngSize(png: Buffer): { width: number; height: number } {
   if (!width || !height) throw new PrototypeError('A screen image has invalid dimensions.');
   return { width, height };
 }
-async function loadImage(source: z.infer<typeof imageSourceSchema>, signal?: AbortSignal): Promise<Buffer> {
+export async function loadImage(source: z.infer<typeof imageSourceSchema>, signal?: AbortSignal): Promise<Buffer> {
   if ('path' in source) return readFile(source.path);
   if ('base64' in source) return Buffer.from(source.base64.replace(/^data:image\/png;base64,/, ''), 'base64');
   const url = new URL(source.url);

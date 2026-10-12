@@ -47,7 +47,8 @@ export class PrototypeProductDriver implements ProductDriver {
   async tapPoint(x: number, y: number): Promise<ActionResult> {
     const last = this.index === this.prototype!.screens.length - 1;
     const screenId = this.screen.id;
-    if (last) return { ok: true, message: 'End of the designed flow: nothing further happens.', prototype: { screenId, target: 'unscored' } };
+    // Not "nothing happens": a cut-off design must not read as a broken control.
+    if (last) return { ok: true, message: 'This is the last screen of the design being tested; the design does not show what happens next. If this screen shows your goal is done, finish as completed; otherwise finish and say what you expected to see next.', prototype: { screenId, target: 'unscored' } };
     const target = this.prototype!.targets.find(t => t.screenId === screenId);
     if (!target) { this.advance(); return { ok: true, message: 'The next screen in the designed flow is shown.', prototype: { screenId, target: 'unscored' } }; }
     const px = x * this.screen.width, py = y * this.screen.height;

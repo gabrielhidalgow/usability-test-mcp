@@ -47,7 +47,7 @@ test('static design flows run through the same MCP: taps, misclicks, move-on, ba
     await act(tap(0.2, 0.2, 'Starter plan'));       // unscored: advances
     assert.match(state.participant.observation.visibleText, /all set/);
     await act(tap(0.5, 0.5, 'Done'));               // end of flow
-    assert.match(state.participant.history.at(-1).result.message, /End of the designed flow/);
+    assert.match(state.participant.history.at(-1).result.message, /last screen of the design being tested/);
     await act(makeDecision({ type: 'finish', outcome: 'completed', reason: 'Set up', visibleEvidence: 'You are all set' }));
     assert.equal(state.phase, 'awaiting_findings');
     state = await call('usability_submit_findings', { runId, requestId: state.requestId, findings: [

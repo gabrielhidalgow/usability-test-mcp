@@ -21,10 +21,13 @@ export async function importFigmaSection(prototypes: Prototypes, rawFlow: unknow
   const png = await loadImage(image, signal);
   const size = pngSize(png);
   const scale = size.width / flow.section.width;
-  if (Math.abs(size.height / flow.section.height - scale) > scale * 0.05) throw new PrototypeError(`The image (${size.width}×${size.height}) does not match the section (${flow.section.width}×${flow.section.height}). Render the section itself with contentsOnly so it is not padded.`);
+  // Figma's section render adds the section title strip above the content; the extra rows are that strip.
+  const top = size.height - flow.section.height * scale;
+  if (top < -2 || top > Math.max(80, size.height * 0.05)) throw new PrototypeError(`The image (${size.width}×${size.height}) does not match the section (${flow.section.width}×${flow.section.height}). Render the section itself with contentsOnly so it is not padded.`);
+  const offset = Math.max(0, top);
   if (scale < 0.5) throw new PrototypeError(`The section rendered at ${Math.round(scale * 100)}% of its size, too small to read. Request it with a larger maxDimension, split the flow into a smaller section, or export the section from Figma as PNG and use usability_import_figma_export.`);
   return importCrops(prototypes, flow.name, device, { tool: 'figma-mcp', fileKey: flow.fileKey, nodeId: flow.sectionId }, png,
-    flow.screens.map(s => ({ id: s.id, name: s.name, box: { x: s.x * scale, y: s.y * scale, width: s.width * scale, height: s.height * scale } })),
+    flow.screens.map(s => ({ id: s.id, name: s.name, box: { x: s.x * scale, y: offset + s.y * scale, width: s.width * scale, height: s.height * scale } })),
     flow.targets.map(t => ({ ...t, x: t.x * scale, y: t.y * scale, width: t.width * scale, height: t.height * scale })), signal);
 }
 

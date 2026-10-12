@@ -52,15 +52,16 @@ export const flowSchema = z.strictObject({
 export type FigmaFlow = z.infer<typeof flowSchema>;
 const screenId = (nodeId: string) => nodeId.replace(/[^A-Za-z0-9_.:-]/g, '-').slice(0, 80);
 
-/** Rows top to bottom (frames whose vertical ranges overlap share a row), left to right within a row. */
-export function layoutOrder<T extends { x: number; y: number; height: number }>(items: T[]): T[] {
+/** Rows top to bottom (frames whose vertical ranges overlap share a row), each left to right. */
+export function layoutRows<T extends { x: number; y: number; height: number }>(items: T[]): T[][] {
   const rows: T[][] = [];
   for (const item of [...items].sort((a, b) => a.y - b.y)) {
     const row = rows.find(r => r.some(o => item.y < o.y + o.height && o.y < item.y + item.height));
     if (row) row.push(item); else rows.push([item]);
   }
-  return rows.flatMap(r => r.sort((a, b) => a.x - b.x));
+  return rows.map(r => r.sort((a, b) => a.x - b.x));
 }
+export function layoutOrder<T extends { x: number; y: number; height: number }>(items: T[]): T[] { return layoutRows(items).flat(); }
 
 // Child coordinates in get_metadata are relative to their parent; nested targets accumulate offsets.
 function collectTargets(node: FigmaNode, dx: number, dy: number, out: { x: number; y: number; width: number; height: number; label: string }[]) {
@@ -70,8 +71,15 @@ function collectTargets(node: FigmaNode, dx: number, dy: number, out: { x: numbe
     collectTargets(child, x, y, out);
   }
 }
-function flowFromSection(fileKey: string, section: FigmaNode, warnings: string[]): FigmaFlow | undefined {
-  const frames = layoutOrder(section.children.filter(c => SCREEN_TAGS.has(c.tag) && !c.hidden && c.width > 0 && c.height > 0));
+const visibleScreens = (section: FigmaNode) => section.children.filter(c => SCREEN_TAGS.has(c.tag) && !c.hidden && c.width > 0 && c.height > 0);
+function flowFromSection(fileKey: string, section: FigmaNode, warnings: string[], chosen?: string[]): FigmaFlow | undefined {
+  const all = visibleScreens(section);
+  let frames = layoutOrder(all);
+  if (chosen) {
+    // The owner's path, in the owner's order. IDs may use '-' or ':' as in links.
+    frames = chosen.map(id => all.find(f => f.id === id.replace('-', ':')) ?? (() => { throw new FigmaPlanError(`Screen ${id} is not a visible screen in "${section.name}".`); })());
+    if (new Set(frames).size !== frames.length) throw new FigmaPlanError('Each screen can appear once in a flow.');
+  }
   if (frames.length < 2) { warnings.push(`"${section.name}" has fewer than two visible screens, so it is not a flow.`); return undefined; }
   const targets: FigmaFlow['targets'] = [];
   for (const frame of frames) {
@@ -89,7 +97,7 @@ function find(nodes: FigmaNode[], id: string, parent?: FigmaNode): { node: Figma
   return undefined;
 }
 
-export function planFigmaFlows(figmaUrl: string, metadataXml: string) {
+export function planFigmaFlows(figmaUrl: string, metadataXml: string, screenIds?: string[]) {
   const { fileKey, nodeId } = parseFigmaUrl(figmaUrl);
   const roots = parseMetadataXml(metadataXml);
   if (!roots.length) throw new FigmaPlanError('The metadata was empty. Call get_metadata for the link and pass its full XML output.');
@@ -97,9 +105,17 @@ export function planFigmaFlows(figmaUrl: string, metadataXml: string) {
   const hit = nodeId ? find(roots, nodeId) : undefined;
   const start = hit?.node ?? (roots.length === 1 ? roots[0]! : undefined);
   // A frame link means its section is the flow.
-  if (start && SCREEN_TAGS.has(start.tag) && hit?.parent?.tag === 'section') { const flow = flowFromSection(fileKey, hit.parent, warnings); return { fileKey, flows: flow ? [flow] : [], needsChoice: false, warnings }; }
-  if (start && SCREEN_TAGS.has(start.tag)) throw new FigmaPlanError('That link points to a single screen. Link the section that holds the whole flow (right-click the section → Copy link).');
-  if (start?.tag === 'section') { const flow = flowFromSection(fileKey, start, warnings); if (!flow) throw new FigmaPlanError(warnings.join(' ')); return { fileKey, flows: [flow], needsChoice: false, warnings }; }
+  const section = start && SCREEN_TAGS.has(start.tag) && hit?.parent?.tag === 'section' ? hit.parent : start?.tag === 'section' ? start : undefined;
+  if (start && SCREEN_TAGS.has(start.tag) && !section) throw new FigmaPlanError('That link points to a single screen. Link the section that holds the whole flow (right-click the section → Copy link).');
+  if (section) {
+    if (screenIds) { const flow = flowFromSection(fileKey, section, warnings, screenIds)!; return { fileKey, flows: [flow], needsChoice: false, warnings }; }
+    const flow = flowFromSection(fileKey, section, warnings);
+    if (!flow) throw new FigmaPlanError(warnings.join(' '));
+    // Spec boards hold several journeys, alternatives and error states in rows; a person follows one path.
+    const rows = layoutRows(visibleScreens(section)).map((r, i) => ({ row: i + 1, screens: r.map(f => ({ id: f.id, name: f.name })) }));
+    const board = rows.length > 1 || flow.screens.length > 8;
+    return { fileKey, flows: [flow], needsChoice: board, ...(board ? { rows } : {}), warnings };
+  }
   // Page or whole file: every section is a candidate flow, plus loose top-level screens.
   const scope = start ? start.children : roots.flatMap(r => r.tag === 'canvas' || r.tag === 'page' || r.tag === 'document' ? r.children : [r]);
   const flows = scope.filter(n => n.tag === 'section').map(s => flowFromSection(fileKey, s, warnings)).filter((f): f is FigmaFlow => Boolean(f));

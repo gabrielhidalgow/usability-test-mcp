@@ -12,7 +12,7 @@ import { pngSize } from '../../src/prototypes/store.js';
 
 const LINK = 'https://www.figma.com/design/AbCdEfGhIjKlMnOpQrStUv/Onboarding?node-id=10-1';
 test('a plain Figma link becomes a testable flow from one section render, with export fallbacks', async () => {
-  const one = await renderSection(1), two = await renderSection(2);
+  const one = await renderSection(1), two = await renderSection(2), titled = await renderSection(1, 25);
   const root = await mkdtemp(join(tmpdir(), 'figma-import-'));
   const server = createServer({ artifactRoot: root, headless: true }); const client = new Client({ name: 'figma-test-double', version: '1' });
   const [a, b] = InMemoryTransport.createLinkedPair(); await server.connect(b); await client.connect(a);
@@ -23,7 +23,9 @@ test('a plain Figma link becomes a testable flow from one section render, with e
     try { return JSON.parse(text); } catch { return { error: text }; }
   };
   try {
-    const plan = await call('usability_plan_figma_flow', { figmaUrl: LINK, metadataXml: SECTION_XML });
+    const board = await call('usability_plan_figma_flow', { figmaUrl: LINK, metadataXml: SECTION_XML });
+    assert.equal(board.needsChoice, true); assert.match(board.nextSteps, /screens form the path/);
+    const plan = await call('usability_plan_figma_flow', { figmaUrl: LINK, metadataXml: SECTION_XML, screenIds: ['10:2', '10:3', '10:4'] });
     assert.match(plan.nextSteps, /ONE Figma call: get_screenshot\(fileKey, nodeId=sectionId/);
     const flow = plan.flows[0];
     // 1x and 2x renders both crop to the right screens and keep the target on the button.
@@ -34,6 +36,11 @@ test('a plain Figma link becomes a testable flow from one section render, with e
       const stored = JSON.parse(await readFile(join(root, 'prototypes', imported.prototype.prototypeId, 'prototype.json'), 'utf8'));
       assert.deepEqual([stored.targets[0].x, stored.targets[0].y], [150 * scale, 200 * scale]);
     }
+    // A render with Figma's title strip on top still crops exactly to each screen (no labels above it).
+    const withTitle = await call('usability_import_figma_section', { flow, image: { path: titled.path } });
+    const first = await readFile(join(root, 'prototypes', withTitle.prototype.prototypeId, 'screens', '001.png'));
+    const exact = await readFile(join(root, 'prototypes', (await call('usability_import_figma_section', { flow, image: { path: one.path } })).prototype.prototypeId, 'screens', '001.png'));
+    assert(first.equals(exact), 'title strip offset applied');
     const { prototypeId } = (await call('usability_import_figma_section', { flow, image: { path: one.path } })).prototype;
     let state = await call('usability_test_prototype', { prototypeId, goal: 'Get started on a plan', contextCheck: { mode: 'first-visit', isolation: 'host-reported fresh', exposure: [] } });
     const tap = makeDecision({ type: 'tap_point', x: 0.5, y: 0.733, visibleLabel: 'Get started', capability: null }); tap.contextIsolation = 'host-reported fresh';
@@ -64,5 +71,5 @@ test('a plain Figma link becomes a testable flow from one section render, with e
     assert.equal(fromFolder.prototype.screens.length, 3);
     assert.deepEqual(pngSize(await readFile(join(folder, '1 welcome.png'))), { width: 400, height: 300 });
     await rm(dir, { recursive: true, force: true });
-  } finally { await client.close(); await server.close(); for (const d of [root, one.dir, two.dir]) await rm(d, { recursive: true, force: true }); }
+  } finally { await client.close(); await server.close(); for (const d of [root, one.dir, two.dir, titled.dir]) await rm(d, { recursive: true, force: true }); }
 });

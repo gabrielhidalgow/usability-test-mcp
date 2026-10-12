@@ -14,11 +14,19 @@ test('plain Figma links of every kind are understood', () => {
 
 test('a section becomes one ordered flow with frame-relative @tap targets', () => {
   const plan = planFigmaFlows(`https://www.figma.com/design/${KEY}/x?node-id=10-1`, SECTION_XML);
-  assert.equal(plan.needsChoice, false);
+  // Two rows: treated as a board, so the owner is shown the rows and picks the path.
+  assert.equal(plan.needsChoice, true);
+  assert.deepEqual('rows' in plan && plan.rows?.map(r => r.screens.map(s => s.name)), [['Welcome', 'Plan'], ['Done']]);
   const flow = plan.flows[0]!;
   assert.deepEqual(flow.screens.map(s => s.name), ['Welcome', 'Plan', 'Done'], 'rows top to bottom, left to right');
   assert.deepEqual(flow.targets, [{ screenId: '10:2', x: 150, y: 200, width: 100, height: 40, label: 'Get started', basis: 'owner-marked' }]);
   assert.deepEqual(flow.section, { width: 920, height: 720 });
+  // The owner's chosen path, in the owner's order, keeps its targets and costs no extra Figma call.
+  const chosen = planFigmaFlows(`https://www.figma.com/design/${KEY}/x?node-id=10-1`, SECTION_XML, ['10-3', '10:2', '10:4']);
+  assert.equal(chosen.needsChoice, false);
+  assert.deepEqual(chosen.flows[0]!.screens.map(s => s.name), ['Plan', 'Welcome', 'Done']);
+  assert.equal(chosen.flows[0]!.targets.length, 1);
+  assert.throws(() => planFigmaFlows(`https://www.figma.com/design/${KEY}/x?node-id=10-1`, SECTION_XML, ['10:2', '99:9']), /not a visible screen/);
   // A link to one frame inside the section resolves to the section.
   assert.equal(planFigmaFlows(`https://www.figma.com/design/${KEY}/x?node-id=10-3`, SECTION_XML).flows[0]!.sectionId, '10:1');
 });

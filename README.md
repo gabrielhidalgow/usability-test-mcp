@@ -143,7 +143,7 @@ The same install, questionnaire, participants, methodology and reports work for 
 
 ## Test a Figma flow from a plain link
 
-Paste any Figma design link: a **section** (one flow), a **page** or a **whole file** (the tool lists the sections; test one, several or all, each as its own flow). Lay a flow's screens out in a section, left to right (more rows run top to bottom). To score taps, name the element that should be tapped on each screen with a layer starting `@tap` (it can be an invisible rectangle). Unmarked steps are recorded and judged afterwards.
+Paste any Figma design link: a **section**, a **page** or a **whole file** (the tool lists the sections; test one, several or all, each as its own flow). When a section is a spec board with several rows (journeys, alternative versions, error states), the tool shows the rows and you pick the screens one person would go through, in order; that costs no extra Figma call. Lay a flow's screens out in a section, left to right (more rows run top to bottom). To score taps, name the element that should be tapped on each screen with a layer starting `@tap` (it can be an invisible rectangle). Unmarked steps are recorded and judged afterwards.
 
 > Test this Figma flow: https://www.figma.com/design/…?node-id=… The user is a first-time small business owner trying to start on a plan.
 

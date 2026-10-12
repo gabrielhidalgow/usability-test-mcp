@@ -201,12 +201,12 @@ export function createServer(config: AppConfig) {
     instructions: 'Show the owner the screen order and which steps are scored (owner-marked or proposed-approved targets) or unscored. Then start participants with usability_test_prototype from a FRESH context (contextCheck first-visit, host-reported fresh), or save a project plan with platform=prototype and target=prototypeId.' })));
   server.registerTool('usability_plan_figma_flow', {
     description: 'Setup coordinator: turn a plain Figma link plus the Figma MCP get_metadata XML for that link (or its page) into ordered flows: screens left to right / top to bottom, @tap layers as owner-marked targets. Page or file links return every section for the owner to choose. Costs no Figma calls itself.',
-    inputSchema: z.strictObject({ figmaUrl: z.string().min(1), metadataXml: z.string().min(1).max(5_000_000) }),
+    inputSchema: z.strictObject({ figmaUrl: z.string().min(1), metadataXml: z.string().min(1).max(5_000_000), screenIds: z.array(z.string().min(1)).min(2).max(40).optional() }),
     annotations: { readOnlyHint: true, openWorldHint: false },
-  }, async ({ figmaUrl, metadataXml }) => prototypeResponse(async () => {
-    const plan = planFigmaFlows(figmaUrl, metadataXml);
+  }, async ({ figmaUrl, metadataXml, screenIds }) => prototypeResponse(async () => {
+    const plan = planFigmaFlows(figmaUrl, metadataXml, screenIds);
     return { ...plan, nextSteps: plan.needsChoice
-      ? 'Show the owner the sections (name and screen count) and ask which to test: one, several or all. Each chosen section is a separate flow and test.'
+      ? ('rows' in plan ? 'This section is a board with several rows (journeys, alternatives, error states). Show the owner the rows and ask which screens form the path one person would follow, in order (e.g. the happy path), then call this tool again with the same XML and screenIds. No extra Figma call is needed.' : 'Show the owner the sections (name and screen count) and ask which to test: one, several or all. Each chosen section is a separate flow and test.')
       : 'For each flow: confirm screen order and targets with the owner, then make ONE Figma call: get_screenshot(fileKey, nodeId=sectionId, contentsOnly=true, maxDimension=longer edge of section.width/height, at most 16384). Pass its URL with the flow to usability_import_figma_section. Do not screenshot screens one by one (Figma limits free and View/Collab seats to about 20 calls a month).' };
   }));
   server.registerTool('usability_import_figma_section', {

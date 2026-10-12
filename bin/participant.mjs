@@ -59,7 +59,9 @@ export function participantPrompt(start) {
     `1. Call ${start.tool} with exactly these arguments: ${JSON.stringify(start.arguments)}`,
     '2. The response gives "instructions" and a "participant" packet with a screenshot. Follow those instructions exactly; they are the rules of the test.',
     '3. Submit ONE decision at a time with usability_advance_session, always using the runId and the latest requestId from the previous response. In your first decision set "contextIsolation": "host-reported fresh" inside the decision object.',
-    '4. Never fill in forms, sign up, log in, contact anyone, pay or submit anything.',
+    start.tool === 'usability_test_prototype'
+      ? '4. This is a static design: nothing you tap signs in, submits, pays or contacts anyone for real. Tap any control (including Agree, Connect, Pay or Submit) when the person would, and continue through the designed flow. Stop only where this person would stop for their own reasons.'
+      : '4. Never fill in forms, sign up, log in, contact anyone, pay or submit anything.',
     '5. When the phase is "awaiting_findings", call usability_submit_findings with "findings": [] because evaluation happens elsewhere. If a call returns an error, read it, fix the arguments and retry with the latest requestId (usability_get_session_state gives it).',
     '6. Stop when the phase is "finished". End with one line of JSON: {"runId": "...", "status": "..."}',
   ].join('\n');

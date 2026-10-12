@@ -72,12 +72,15 @@ test('preflight, canary and lock stop the run before anything starts', async () 
   } finally { await f.close(); }
 });
 
-test('runner forces one clean first-visit participant and reads canary replies strictly', () => {
+test('runner forces one clean first-visit participant and reads canary replies strictly', async () => {
   const prepared = prepareStart({ tool: 'usability_run_project', arguments: { projectId: 'project-x', journeyId: 'j', participantCount: 3 } });
   assert.equal(prepared.arguments.participantCount, 1);
   assert.deepEqual(prepared.arguments.options.contextCheck, { mode: 'first-visit', isolation: 'host-reported fresh', exposure: [] });
   assert.throws(() => prepareStart({ tool: 'usability_quick_test', arguments: { contextCheck: { mode: 'informed-walkthrough', isolation: 'shared', exposure: [] } } }), /first-visit/);
   assert.throws(() => prepareStart({ tool: 'usability_get_report', arguments: {} }), /--start/);
+  const { participantPrompt } = await import('../../bin/participant.mjs');
+  assert.match(participantPrompt(prepareStart({ tool: 'usability_test_prototype', arguments: { prototypeId: 'prototype-x', goal: 'g', contextCheck: { mode: 'first-visit', isolation: 'host-reported fresh', exposure: [] } } })), /static design: nothing you tap/);
+  assert.match(participantPrompt(prepareStart({ tool: 'usability_quick_test', arguments: { target: 'https://x.test', goal: 'g' } })), /Never fill in forms/);
   assert.equal(parseCanary('{"mentions": [], "projectMaterial": []}').passed, true);
   assert.equal(parseCanary('NONE').passed, false, 'non-JSON is not a pass');
   assert.equal(parseCanary('{"mentions": ["RewardPay"], "projectMaterial": []}').passed, false);

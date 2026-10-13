@@ -69,7 +69,7 @@ export function renderExecutiveMarkdown(report: UsabilityReport, directory: stri
   const selected = distinct.slice(0, 3);
   const lines = ['# Usability Test — Executive report', '',
     `**Task:** ${compact(report.goal, 220)}`, '',
-    `**Product:** ${compact(report.target, 160)} · **Date:** ${report.generatedAt.slice(0, 10)} · **Scope:** ${report.platform === 'native' ? 'native app (experimental)' : report.platform === 'prototype' ? 'static design prototype (e.g. Figma frames)' : report.viewport === 'mobile' ? 'mobile web' : report.viewport === 'desktop' ? 'desktop web' : 'web (device unspecified)'} · ${outcomes.length} synthetic participant(s).`, '',
+    `**Product:** ${compact(report.targetLabel ?? report.target, 160)} · **Date:** ${report.generatedAt.slice(0, 10)} · **Scope:** ${report.platform === 'native' ? 'native app (experimental)' : report.platform === 'prototype' ? 'static design prototype (e.g. Figma frames)' : report.viewport === 'mobile' ? 'mobile web' : report.viewport === 'desktop' ? 'desktop web' : 'web (device unspecified)'} · ${outcomes.length} synthetic participant(s).`, '',
     `**Audience:** ${compact([...new Set(outcomes.map(s => s.persona.context))].join('; '), 180)}`, '',
     '**Evidence from synthetic participants, not human research.** Completion and findings are model judgments.', ''];
   if (report.sessions.some(s => s.provider.includes('test-double'))) lines.push('**DEMO / TEST DOUBLE — fixture verification, not AI usability research.**', '');

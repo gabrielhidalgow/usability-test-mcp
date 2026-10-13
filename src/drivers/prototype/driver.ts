@@ -29,6 +29,11 @@ export class PrototypeProductDriver implements ProductDriver {
     this.config = config; this.prototype = await this.store.get(config.input.target);
   }
   async stop(): Promise<void> {}
+  targetLabel() {
+    const p = this.prototype; if (!p) return undefined;
+    const source = p.source.tool === 'figma-mcp' || p.source.tool === 'figma-export' ? 'Figma' : p.source.tool;
+    return `${p.name} (${source} design, ${p.screens.length} screens)`;
+  }
   private get screen() { return this.prototype!.screens[this.index]!; }
   async screenshot(): Promise<EvidenceArtifact> {
     const path = join(this.config!.directory, 'screenshots', `${String(++this.sequence).padStart(4, '0')}.png`);

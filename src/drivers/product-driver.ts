@@ -8,6 +8,8 @@ export type DriverStartConfig = { onWindowClosed?: () => void; input: SessionInp
 export interface ProductDriver {
   readonly kind: 'web' | 'mobile' | 'prototype';
   readonly limitations?: string[];
+  /** A human-readable name for targets whose ID is not meaningful (e.g. an imported design flow). */
+  targetLabel?(): string | undefined;
   setViewStatus?(status: ViewStatus): Promise<void>;
   tapPoint?(x: number, y: number): Promise<ActionResult>;
   enterText?(value: string): Promise<ActionResult>;

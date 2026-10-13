@@ -44,9 +44,9 @@ test('artifact IDs reject path traversal and common log secrets are redacted', (
 
 test('site classification separates the product (incl. subdomains) from third parties', async () => {
   const { siteKey } = await import('../../src/core/safety.js');
-  assert.equal(siteKey('www.rewardpay.com.au'), siteKey('api.rewardpay.com.au'));
-  assert.notEqual(siteKey('www.rewardpay.com.au'), siteKey('www.google-analytics.com'));
-  assert.notEqual(siteKey('rewardpay.com.au'), siteKey('other.com.au'), 'com.au is a public suffix, not a shared site');
+  assert.equal(siteKey('www.example.com.au'), siteKey('api.example.com.au'));
+  assert.notEqual(siteKey('www.example.com.au'), siteKey('www.google-analytics.com'));
+  assert.notEqual(siteKey('example.com.au'), siteKey('other.com.au'), 'com.au is a public suffix, not a shared site');
   assert.equal(siteKey('shop.example.co.uk'), 'example.co.uk');
   assert.equal(siteKey('app.example.com'), 'example.com');
   assert.notEqual(siteKey('127.0.0.1'), siteKey('localhost'));

@@ -27,7 +27,7 @@ export function sessionReport(session: SessionRecord, interpretations: Interpret
   return {
     id: session.id, kind: 'session', synthetic: true, generatedAt: new Date().toISOString(),
     platform: session.input.platform, viewport: session.input.platform === 'web' ? session.input.viewport : undefined, target: session.input.target, scenario: session.input.scenario, goal: session.input.goal, disclaimer: DISCLAIMER,
-    methodologyVersion: METHODOLOGY_VERSION, exercise: session.input.exercise ?? 'task', focus: session.input.focus,
+    methodologyVersion: METHODOLOGY_VERSION, exercise: session.input.exercise ?? 'task', focus: session.input.focus, targetLabel: session.targetLabel,
     sessions: [{ id: session.id, continuation: session.continuation, presentation: session.input.presentation, handoff: session.input.handoff, contextCheck: session.input.contextCheck, focusExit: session.focusExit, persona: session.input.persona, status: session.status, reason: session.reason,
       actions: session.actions, wrongTurns: session.journey.filter(s => s.decision.behavior === 'wrong-turn').length,
       backtracks: session.journey.filter(s => s.decision.selectedAction.type === 'back').length, provider: session.provider }],

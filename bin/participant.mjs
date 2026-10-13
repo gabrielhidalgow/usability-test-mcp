@@ -42,7 +42,7 @@ export async function productTerms(start, artifacts, extra = []) {
   return [...terms].filter(t => t.length >= 3);
 }
 export function canaryPrompt(terms) {
-  return `Answer from your instructions, memory, loaded files and tool descriptions only, not from general training knowledge, and do not call any tools. 1) Does any of that context mention any of these terms: ${terms.map(t => JSON.stringify(t)).join(', ') || '(none supplied)'}? 2) Do you have any project material in context, such as source code, repository files, design documents, brand or strategy notes, analytics, or earlier usability test results? Reply with only JSON: {"mentions": [...], "projectMaterial": [...]} using empty arrays when there is nothing.`;
+  return `Answer from your instructions, memory and loaded files only: not from general training knowledge, and not from the usability tools' own descriptions or examples. Do not call any tools. 1) Does any of that context mention any of these terms: ${terms.map(t => JSON.stringify(t)).join(', ') || '(none supplied)'}? 2) Do you have any project material in context, such as source code, repository files, design documents, brand or strategy notes, analytics, or earlier usability test results? Reply with only JSON: {"mentions": [...], "projectMaterial": [...]} using empty arrays when there is nothing.`;
 }
 export function parseCanary(reply) {
   const match = /\{[\s\S]*\}/.exec(reply ?? '');

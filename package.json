@@ -1,8 +1,8 @@
 {
   "name": "usability-test-mcp",
-  "version": "0.12.2",
+  "version": "0.13.0",
   "private": true,
-  "description": "Local-first synthetic usability testing over MCP",
+  "description": "Usability tests for websites, localhost and Figma flows: synthetic participants, real browser, evidence-backed reports. Works in Claude Code and Codex.",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -18,7 +18,8 @@
     "demo": "tsx examples/demo.ts",
     "check": "npm run typecheck && npm test && npm run build && npm run test:installer",
     "prepare": "npm run build",
-    "test:installer": "node --test tests/installer/*.test.mjs"
+    "test:installer": "node --test tests/installer/*.test.mjs",
+    "readme-assets": "tsx scripts/readme-assets.ts"
   },
   "dependencies": {
     "@axe-core/playwright": "^4.13.0",
@@ -38,8 +39,30 @@
   "files": [
     "bin/",
     "dist/src/**/*.js",
+    "assets/",
     "README.md",
-    "docs/REPORT_TEMPLATE.md",
-    "docs/METHODOLOGY.md"
+    "LICENSE",
+    "docs/*.md"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gabrielhidalgow/usability-test-mcp.git"
+  },
+  "homepage": "https://github.com/gabrielhidalgow/usability-test-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/gabrielhidalgow/usability-test-mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "usability-testing",
+    "ux",
+    "ux-research",
+    "claude-code",
+    "codex",
+    "figma",
+    "playwright",
+    "accessibility"
   ]
 }

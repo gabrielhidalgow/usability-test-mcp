@@ -59,8 +59,8 @@ test('preflight, canary and lock stop the run before anything starts', async () 
     process.env.FAKE_HOST_FAIL = 'auth';
     await assert.rejects(runParticipant({ host: 'claude', start: f.start, artifacts: f.artifacts, hostBin: fakeHost }), e => e instanceof ParticipantError && e.code === 2 && /claude \/login/.test(e.message));
     delete process.env.FAKE_HOST_FAIL;
-    process.env.FAKE_HOST_LEAK = 'RewardPay';
-    await assert.rejects(runParticipant({ host: 'claude', start: f.start, artifacts: f.artifacts, hostBin: fakeHost }), e => e.code === 3 && /RewardPay/.test(e.message) && /informed walkthrough/.test(e.message));
+    process.env.FAKE_HOST_LEAK = 'Acme';
+    await assert.rejects(runParticipant({ host: 'claude', start: f.start, artifacts: f.artifacts, hostBin: fakeHost }), e => e.code === 3 && /Acme/.test(e.message) && /informed walkthrough/.test(e.message));
     delete process.env.FAKE_HOST_LEAK;
     assert.deepEqual(await readdir(f.artifacts).then(d => d.filter(n => n === 'sessions')), [], 'no session was started');
     await writeFile(join(f.artifacts, 'active-run.json'), JSON.stringify({ pid: process.pid, startedAt: 'earlier', tool: 'usability_quick_test' }));
@@ -83,5 +83,5 @@ test('runner forces one clean first-visit participant and reads canary replies s
   assert.match(participantPrompt(prepareStart({ tool: 'usability_quick_test', arguments: { target: 'https://x.test', goal: 'g' } })), /Never fill in forms/);
   assert.equal(parseCanary('{"mentions": [], "projectMaterial": []}').passed, true);
   assert.equal(parseCanary('NONE').passed, false, 'non-JSON is not a pass');
-  assert.equal(parseCanary('{"mentions": ["RewardPay"], "projectMaterial": []}').passed, false);
+  assert.equal(parseCanary('{"mentions": ["Acme"], "projectMaterial": []}').passed, false);
 });

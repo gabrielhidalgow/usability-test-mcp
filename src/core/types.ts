@@ -95,11 +95,13 @@ export type SessionRecord = {
   failureStage?: string;
   continuation?: Continuation;
   focusExit?: boolean;
+  targetLabel?: string;
 };
 export type UsabilityReport = {
   id: string; kind: 'session' | 'round'; synthetic: true; generatedAt: string;
   methodologyVersion?: string; exercise?: 'task' | 'first-impression';
   focus?: SessionInput['focus'];
+  targetLabel?: string;
   baselineComparison?: import('./run-comparison.js').BaselineComparison;
   platform?: 'web' | 'native' | 'prototype'; viewport?: 'desktop' | 'mobile'; target: string; scenario: string; goal: string; disclaimer: string;
   sessions: { id: string; persona: Persona; status: SessionStatus; reason: string;

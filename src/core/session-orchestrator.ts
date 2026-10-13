@@ -80,6 +80,7 @@ export class SessionOrchestrator {
     };
     try {
       await run(() => driver.start({ input, directory: paths.directory, signal, onWindowClosed: () => windowClosed.abort(new BrowserWindowClosed('Browser window closed by viewer')) }));
+      record.targetLabel = driver.targetLabel?.();
       stage = 'observation';
       let observation = await run(() => driver.getObservation());
       record.initialObservation = observation;

@@ -55,6 +55,7 @@ test('static design flows run through the same MCP: taps, misclicks, move-on, ba
     assert.equal(state.status, 'completed');
     const md = (await client.callTool({ name: 'usability_get_report', arguments: { id: runId, format: 'markdown' } })).content as { text: string }[];
     assert.match(md[0]!.text, /static design prototype/);
+    assert.match(md[0]!.text, /\*\*Product:\*\* Ledger onboarding \(test-fixture design, 3 screens\)/);
     assert.match(md[0]!.text, /Prototype:\*\* first tap on target on 0 of 1 scored screen visit\(s\); 3 misclick\(s\); facilitator moved on 1 time\(s\); 2 unscored tap\(s\)/);
     assert.match(md[0]!.text, /Accessibility not assessed: static images/);
     const details = (await client.callTool({ name: 'usability_get_report', arguments: { id: runId, format: 'details' } })).content as { text: string }[];

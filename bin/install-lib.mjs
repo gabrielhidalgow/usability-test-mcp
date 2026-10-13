@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -69,7 +69,18 @@ export function sourceCommit(explicit) {
   if (explicit) return explicit;
   const git = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: packageRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
   if (git.status === 0 && /^[0-9a-f]{40}$/.test(git.stdout.trim()) && existsSync(join(packageRoot, '.git'))) return git.stdout.trim();
-  return /^[0-9a-f]{40}$/.test(pkg.gitHead ?? '') ? pkg.gitHead : null;
+  return commitFromLockfiles(packageRoot) ?? (/^[0-9a-f]{40}$/.test(pkg.gitHead ?? '') ? pkg.gitHead : null);
+}
+/** `npx github:…` installs into <dir>/node_modules/<name>; npm records the resolved commit in that dir's lockfiles. */
+export function commitFromLockfiles(root) {
+  for (const lock of [join(root, '..', '.package-lock.json'), join(root, '..', '..', 'package-lock.json')]) {
+    try {
+      const resolved = JSON.parse(readFileSync(lock, 'utf8')).packages?.[`node_modules/${pkg.name}`]?.resolved ?? '';
+      const sha = /#([0-9a-f]{40})$/.exec(resolved)?.[1];
+      if (sha) return sha;
+    } catch { /* not installed by npm from git */ }
+  }
+  return null;
 }
 export const statePath = dir => join(dir, 'install.json');
 export async function readState(dir) {

@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { renderCommand, writeCommand, removeCommand, isUnmodifiedGenerated, commandPath, writeState } from '../../bin/install-lib.mjs';
+import { renderCommand, writeCommand, removeCommand, isUnmodifiedGenerated, commandPath, writeState, commitFromLockfiles } from '../../bin/install-lib.mjs';
 import { main } from '../../bin/usability-test-mcp.mjs';
 
 const cli = '/usr/bin/node /opt/usability/bin/usability-test-mcp.mjs';
@@ -61,4 +61,15 @@ test('update reinstalls the recorded hosts only when GitHub has a newer commit',
     await main(['update', '--dir', dir]); assert.match(logs.pop(), /UPDATED: aaaaaaa -> bbbbbbb/);
     assert.equal((await readFile(record, 'utf8')).trim(), `setup --host claude-code,codex --dir ${dir} --commit ${'b'.repeat(40)}`);
   } finally { console.log = log; delete process.env.USABILITY_TEST_LATEST; delete process.env.USABILITY_TEST_SETUP_CMD; await rm(dir, { recursive: true, force: true }); }
+});
+
+test('an npx install from GitHub knows its commit, so the first run does not reinstall', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'npx-'));
+  try {
+    const root = join(dir, 'node_modules', 'usability-test-mcp'); await mkdir(root, { recursive: true });
+    assert.equal(commitFromLockfiles(root), null);
+    const sha = 'a'.repeat(40);
+    await writeFile(join(dir, 'package-lock.json'), JSON.stringify({ packages: { 'node_modules/usability-test-mcp': { resolved: `git+ssh://git@github.com/gabrielhidalgow/usability-test-mcp.git#${sha}` } } }));
+    assert.equal(commitFromLockfiles(root), sha);
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });

@@ -188,6 +188,12 @@ Yes, as long as it runs local MCP servers and accepts image results: `setup --ho
 | [Safety and limits](docs/SAFETY.md) | Browser policy, blocked requests, privacy |
 | [Native apps](docs/NATIVE.md) | Experimental Maestro adapter |
 
+## About
+
+Made by [Gabriel Hidalgo](https://gabrielhidalgo.design/), a product designer. I built it to get quick usability feedback on live sites, local builds and Figma flows without leaving my chat, and to keep that feedback honest about what synthetic participants can and can't tell you.
+
+[gabrielhidalgo.design](https://gabrielhidalgo.design/) · [GitHub](https://github.com/gabrielhidalgow)
+
 ## Contributing
 
 Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Run `npm run check` before opening a PR.

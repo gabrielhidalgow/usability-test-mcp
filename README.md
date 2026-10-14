@@ -192,7 +192,7 @@ Yes, as long as it runs local MCP servers and accepts image results: `setup --ho
 
 Made by [Gabriel Hidalgo](https://gabrielhidalgo.design/), a product designer. I built it to get quick usability feedback on live sites, local builds and Figma flows without leaving my chat, and to keep that feedback honest about what synthetic participants can and can't tell you.
 
-[gabrielhidalgo.design](https://gabrielhidalgo.design/) · [GitHub](https://github.com/gabrielhidalgow)
+[gabrielhidalgo.design](https://gabrielhidalgo.design/) · [X @ghidalgodesign](https://x.com/ghidalgodesign) · [GitHub](https://github.com/gabrielhidalgow)
 
 ## Contributing
 

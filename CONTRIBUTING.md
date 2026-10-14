@@ -24,6 +24,8 @@ Useful scripts:
 | `cd video && npm run render` | Renders the README loop with [HyperFrames](https://hyperframes.heygen.com); then rebuild `docs/assets/cursor-loop.webp` from the MP4 (20 fps, 1280 px, `img2webp -loop 0 -d 50 -lossy -q 90`) |
 | `node bin/usability-test-mcp.mjs setup --host claude-code --dir /tmp/um` | Installs your working copy into a throwaway folder |
 
+**Windows and Linux:** the repo has a manual GitHub Actions check (Actions → *Cross-platform check* → Run workflow). It runs `npm run check`, a real one-command setup for Claude Code and Codex, and the generated slash commands in Git Bash and PowerShell. It never runs on push.
+
 ## Rules that keep the tests honest
 
 These come from [AGENTS.md](AGENTS.md):

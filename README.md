@@ -41,7 +41,7 @@
 
 ## Quick start
 
-**1. Install** (Node 22+; macOS or Linux):
+**1. Install** (Node 22+; macOS, Linux or Windows):
 
 ```bash
 npx --yes github:gabrielhidalgow/usability-test-mcp setup --host claude-code,codex
@@ -148,7 +148,7 @@ Nothing beyond the Claude or ChatGPT subscription you already use with Claude Co
 <details>
 <summary><b>Where does my data go?</b></summary>
 
-The browser, evidence and reports stay on your computer (`~/.local/share/usability-mcp/artifacts/`). Screenshots and visible text go to your connected chat for reasoning, as with anything else you share with it. Source code is never sent.
+The browser, evidence and reports stay on your computer (`~/.local/share/usability-mcp/artifacts/`, or `%LOCALAPPDATA%\usability-mcp\artifacts` on Windows). Screenshots and visible text go to your connected chat for reasoning, as with anything else you share with it. Source code is never sent.
 </details>
 
 <details>

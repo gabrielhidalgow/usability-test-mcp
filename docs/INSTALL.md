@@ -6,7 +6,11 @@
 
 - **Node.js 22+**, npm and Git.
 - The CLI of the chat you use: [Claude Code](https://code.claude.com/docs) or [Codex](https://developers.openai.com/codex/), logged in with your subscription.
-- macOS or Linux for automatic setup. Windows and remote-only chat apps are not supported yet.
+- macOS, Linux or Windows. **Windows is experimental:** install, setup for both hosts and the generated commands are checked on a clean Windows machine, but not yet in day-to-day use.
+  - Claude Code on Windows needs [Git for Windows](https://git-scm.com/downloads/win) (it runs commands in Git Bash).
+  - Codex on Windows runs commands in PowerShell; `/prompts:usability-test` is generated for that.
+  - Prefer WSL? Run the install command inside WSL and use the Linux instructions.
+- Remote-only chat apps (ChatGPT in a browser) can't start a local MCP server.
 
 No model API key, npm account or GitHub login is needed. The repository is public.
 
@@ -26,9 +30,9 @@ Use `--host claude-code` or `--host codex` for only one of them. The command:
 
 Restart Claude Code or Codex afterwards (or reconnect with `/mcp`).
 
-**Pinned version:** add a tag or commit, for example `github:gabrielhidalgow/usability-test-mcp#v0.13.2`.
+**Pinned version:** add a tag or commit, for example `github:gabrielhidalgow/usability-test-mcp#v0.14.0`.
 
-**Other hosts:** `--host claude-desktop` (macOS) merges the server into Claude Desktop's config with a backup. `--host manual` prints the configuration for any other local MCP host. The old `--host claude` alias still means Claude Desktop.
+**Other hosts:** `--host claude-desktop` (macOS and Windows) merges the server into Claude Desktop's config with a backup. `--host manual` prints the configuration for any other local MCP host. The old `--host claude` alias still means Claude Desktop.
 
 ## Keeping it up to date
 
@@ -62,11 +66,11 @@ This removes the MCP registrations and the generated commands (only ones you hav
 
 ## Where things live
 
-| What | Where |
-| --- | --- |
-| Runtime | `~/.local/share/usability-mcp/runtime/` |
-| Reports, screenshots, saved projects | `~/.local/share/usability-mcp/artifacts/` |
-| Install record | `~/.local/share/usability-mcp/install.json` |
+| What | macOS and Linux | Windows |
+| --- | --- | --- |
+| Runtime | `~/.local/share/usability-mcp/runtime/` | `%LOCALAPPDATA%\usability-mcp\runtime\` |
+| Reports, screenshots, saved projects | `~/.local/share/usability-mcp/artifacts/` | `%LOCALAPPDATA%\usability-mcp\artifacts\` |
+| Install record | `~/.local/share/usability-mcp/install.json` | `%LOCALAPPDATA%\usability-mcp\install.json` |
 
 Use `--dir "/absolute/path"` with `setup`, `update`, `doctor` and `uninstall` to put everything elsewhere. Registrations use absolute paths to Node and the server, so rerun setup if you move Node.
 
@@ -122,6 +126,8 @@ There are no model credentials to configure.
 | `doctor` says the CLI is not logged in | Run `claude /login` or `codex login` in a terminal. |
 | The `usability` tools do not appear | Restart the host or reconnect with `/mcp`, then check `usability_health`. |
 | Chromium fails to launch on Linux | `npx playwright install --with-deps chromium` (needs admin rights). |
+| Windows: `claude` can't run commands | Install Git for Windows, then restart Claude Code. |
+| Windows: Codex mangles the start JSON | The command passes it as `--start @file.json`; update with `/prompts:usability-test` (it updates itself). |
 | `/usability-test` is missing | Rerun setup. If you had your own file there, look for `usability-test.md.new`. |
 | A test says project knowledge leaked | See [CLEAN-PARTICIPANTS.md](CLEAN-PARTICIPANTS.md). |
 

@@ -124,7 +124,7 @@ async function main() {
         <div style="font:400 23px ${FONT};color:#9198a1;margin-top:6px">Usability tests for websites, localhost and Figma flows</div></div></div>
       <div style="position:absolute;left:72px;bottom:64px;color:${PAPER};font:600 30px/1.4 ${FONT}">Synthetic participants.<br>Real browser.<br>Evidence-backed reports.<div style="font:400 19px ${FONT};color:#9198a1;margin-top:14px">From Claude Code or Codex. No API keys.</div></div>
       <div style="position:absolute;right:-90px;bottom:28px;width:720px">
-        <img src="${browserShot}" style="display:block;width:720px;border-radius:14px;border:1px solid #30363d;box-shadow:0 30px 80px #0008">
+        <img src="${browserShot}" style="display:block;width:720px;border-radius:14px;border:1px solid #30363d">
         <!-- The issue callout from the README video, anchored under "Options" (page point scaled 720/1280). -->
         <div style="position:absolute;left:${Math.round(targets.options!.x * 720 / 1280)}px;top:${Math.round(targets.options!.y * 720 / 1280) + 22}px;transform:translateX(-50%);background:#dc2626;color:#fff;font:650 17px ${FONT};padding:9px 14px;border-radius:10px;white-space:nowrap;box-shadow:0 12px 30px #0006;display:flex;gap:8px;align-items:center"><span style="width:20px;height:20px;border-radius:10px;background:#ffffff3d;display:grid;place-items:center;font-size:12px">!</span>Issue: pricing is labelled “Options”</div>
       </div></body>`, join(out, 'social-preview.png'), { width: 1280, height: 640 });

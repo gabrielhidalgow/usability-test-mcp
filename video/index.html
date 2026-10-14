@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=1280, height=720" />
+    <meta name="viewport" content="width=1920, height=1080" />
     <title>Usability Test MCP: cursor close-up</title>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
     <style>
@@ -16,9 +16,9 @@
         --green-halo: rgba(21, 128, 61, 0.26);
       }
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      html, body { width: 1280px; height: 720px; overflow: hidden; background: #f6f8fa; }
-      #root { position: relative; width: 1280px; height: 720px; overflow: hidden; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-      #shot { position: absolute; inset: 0; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #f6f8fa; }
+      #root { position: relative; width: 1920px; height: 1080px; overflow: hidden; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      #shot { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform: scale(1.5); transform-origin: 0 0; }
       /* Camera: translate(x,y) scale(s) with origin 0 0 maps page point P to x + s*P on screen. */
       #cam { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; }
       .page { position: absolute; inset: 0; width: 1280px; height: 720px; z-index: 0; }
@@ -44,7 +44,7 @@
     </style>
   </head>
   <body>
-    <div data-hf-id="hf-nu7b" id="root" data-composition-id="main" data-start="0" data-width="1280" data-height="720" data-duration="9">
+    <div data-hf-id="hf-nu7b" id="root" data-composition-id="main" data-start="0" data-width="1920" data-height="1080" data-duration="9">
       <section data-hf-id="hf-zv5o" id="shot" class="clip" data-start="0" data-duration="9" data-track-index="0">
         <div data-hf-id="hf-kgyx" id="cam" data-layout-allow-overflow="true">
           <div data-hf-id="hf-qsaf" class="page" id="p-home"><img data-hf-id="hf-gbvy" src="assets/home.png" alt="" /></div>

@@ -8,7 +8,6 @@ import { chromium, type Page } from 'playwright';
 import { EvidenceRecorder } from '../src/evidence/recorder.js';
 import { SessionOrchestrator } from '../src/core/session-orchestrator.js';
 import { PlaywrightProductDriver } from '../src/drivers/playwright/driver.js';
-import { installObserver, showStatus } from '../src/drivers/playwright/observer.js';
 import { FixtureProvider } from '../tests/fixtures/provider.js';
 import { startDemoSite } from './demo-site.js';
 
@@ -47,11 +46,10 @@ async function shot(page: Page, html: string, path: string, size: { width: numbe
   await page.screenshot({ path });
 }
 const dataUrl = async (path: string) => `data:image/png;base64,${(await readFile(path)).toString('base64')}`;
-const card = (inner: string, extra = '') => `<div style="background:#fff;border:1px solid #d8dee4;border-radius:16px;box-shadow:0 1px 2px #1f23280f,0 24px 60px #1f23281f;overflow:hidden;${extra}">${inner}</div>`;
+const card = (inner: string, extra = '') => `<div style="background:#fff;border:1px solid #d8dee4;border-radius:16px;box-shadow:0 0 0 1px #ffffff14,0 24px 60px #00000080;overflow:hidden;${extra}">${inner}</div>`;
 const windowBar = (title: string) => `<div style="height:40px;background:#f6f8fa;border-bottom:1px solid #d8dee4;display:flex;align-items:center;gap:8px;padding:0 16px;font:13px ${FONT};color:#59636e">${['#ff5f57', '#febc2e', '#28c840'].map(c => `<span style="width:12px;height:12px;border-radius:6px;background:${c}"></span>`).join('')}<span style="margin:0 auto;background:#fff;border:1px solid #d8dee4;border-radius:8px;padding:3px 40px">${title}</span><span style="width:52px"></span></div>`;
-const label = (n: string, text: string) => `<div style="display:flex;align-items:center;gap:10px;font:600 15px ${FONT};color:#3d444d;margin:0 0 14px 2px"><span style="width:24px;height:24px;border-radius:12px;background:${BLUE};color:#fff;display:grid;place-items:center;font-size:13px">${n}</span>${text}</div>`;
-const demoNote = (text: string) => `<div style="display:inline-flex;align-items:center;gap:8px;font:13px ${FONT};color:#59636e"><span style="background:#eef2ff;color:${BLUE};font-weight:600;border-radius:999px;padding:2px 10px">Demo</span>${text}</div>`;
-const backdrop = `background:radial-gradient(1200px 500px at 15% 0%,#e0e9ff 0%,transparent 60%),radial-gradient(900px 500px at 100% 100%,#e8efff 0%,transparent 55%),#f6f8fa`;
+const label = (n: string, text: string) => `<div style="display:flex;align-items:center;gap:10px;font:600 15px ${FONT};color:#e6edf3;margin:0 0 14px 2px"><span style="width:24px;height:24px;border-radius:12px;background:${BLUE};color:#fff;display:grid;place-items:center;font-size:13px">${n}</span>${text}</div>`;
+const backdrop = 'background:#0d1117';
 
 async function center(page: Page, name: string) {
   const box = (await page.getByRole('link', { name, exact: true }).first().boundingBox())!;
@@ -69,18 +67,21 @@ async function main() {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({ deviceScaleFactor: 2, viewport: { width: 1280, height: 720 } });
-    // 1. Clean stills and cursor targets for the video (the composition draws its own cursor and badge).
+    const stills = await browser.newPage({ deviceScaleFactor: 3, viewport: { width: 1280, height: 720 } });
+    // 1. Clean stills and cursor targets for the video (the composition draws its own cursor and callouts).
     const targets: Record<string, { x: number; y: number; width: number; height: number }> = {};
-    await page.goto(site.url); await page.screenshot({ path: join(videoAssets, 'home.png') }); targets.options = await center(page, 'Options');
-    await page.goto(`${site.url}/plans`); await page.screenshot({ path: join(videoAssets, 'plans.png') }); targets.tryPlan = await center(page, 'Try this plan');
-    await page.goto(`${site.url}/start`); await page.screenshot({ path: join(videoAssets, 'start.png') });
+    await stills.goto(site.url); await stills.screenshot({ path: join(videoAssets, 'home.png') }); targets.options = await center(stills, 'Options');
+    await stills.goto(`${site.url}/plans`); await stills.screenshot({ path: join(videoAssets, 'plans.png') }); targets.tryPlan = await center(stills, 'Try this plan');
+    await stills.goto(`${site.url}/start`); await stills.screenshot({ path: join(videoAssets, 'start.png') });
     await writeFile(join(videoAssets, 'targets.json'), JSON.stringify({ viewport: { width: 1280, height: 720 }, ...targets }, null, 2) + '\n');
-    // 2. Live browser with the real viewer overlay (pointer and status), as people see it during a run.
+    // 2. The browser as people watch it: the participant's pointer ring (same look as the live viewer overlay), without the status badge.
     const live = await browser.newPage({ deviceScaleFactor: 2, viewport: { width: 1280, height: 720 } });
-    await installObserver(live);
     await live.goto(site.url);
-    await live.mouse.move(targets.options!.x, targets.options!.y, { steps: 6 });
-    await showStatus(live, { participant: PERSONA, step: 2, phase: 'executing', action: 'click "Options"' });
+    await live.evaluate(([x, y]) => {
+      const ring = document.createElement('div');
+      ring.style.cssText = `position:fixed;left:${x}px;top:${y}px;width:24px;height:24px;border:3px solid #ffb000;background:#ffb00033;border-radius:50%;transform:translate(-50%,-50%);box-sizing:border-box`;
+      document.body.append(ring);
+    }, [targets.options!.x, targets.options!.y]);
     await live.screenshot({ path: join(work, 'browser.png') });
     // 3. A real report from the demo product, run by the deterministic test participant.
     const recorder = new EvidenceRecorder(join(work, 'artifacts'));
@@ -100,8 +101,7 @@ async function main() {
       <div style="display:flex;gap:36px;align-items:flex-start">
         <div style="flex:0 0 880px">${label('1', 'A synthetic participant uses your product')}${card(`${windowBar('littleledger.test')}<img src="${browserShot}" style="display:block;width:880px">`)}</div>
         <div style="flex:1">${label('2', 'You get a short, evidence-backed report')}${card(`<div style="height:535px;overflow:hidden;position:relative">${reportHtml}<div style="position:absolute;inset:auto 0 0 0;height:110px;background:linear-gradient(transparent,#fff)"></div></div>`)}</div>
-      </div>
-      <div style="margin-top:20px">${demoNote('Little Ledger is a built-in demo product, run by a deterministic test participant. Not real research.')}</div></body>`, join(out, 'demo.png'), { width: 1600, height: 720 });
+      </div></body>`, join(out, 'demo.png'), { width: 1600, height: 676 });
     // 5. Report on its own.
     await shot(page, `<body style="margin:0;${backdrop};padding:32px">${card(reportHtml, 'max-width:860px')}</body>`, join(out, 'demo-report.png'), { width: 924, height: 1180 });
     // 6. Figma flow: drawn demo frames in order, with the tap that moves on.
@@ -116,8 +116,7 @@ async function main() {
       phone(`<div style="font:750 26px ${FONT};letter-spacing:-.02em">You are all set</div><div style="margin-top:14px;color:#4b5b63;font-size:16px">Your workspace is ready. Add your first invoice.</div>${button('Open workspace')}`),
     ];
     await shot(page, `<body style="margin:0;${backdrop};padding:36px 44px;font-family:${FONT}">${label('✓', 'Figma flow: one frame at a time, each tap checked against the @tap target')}
-      <div style="display:flex;gap:26px">${frames.join(arrow)}</div>
-      <div style="margin-top:20px">${demoNote('Demo frames. The white ring marks where the participant tapped.')}</div></body>`, join(out, 'demo-figma.png'), { width: 1180, height: 700 });
+      <div style="display:flex;gap:26px">${frames.join(arrow)}</div></body>`, join(out, 'demo-figma.png'), { width: 1180, height: 668 });
     // 7. Social preview (upload in GitHub: Settings → Social preview).
     await shot(page, `<body style="margin:0;width:1280px;height:640px;background:radial-gradient(900px 500px at 0% 0%,#16264a 0%,transparent 60%),#0d1117;font-family:${FONT};overflow:hidden;position:relative">
       <div style="display:flex;align-items:center;gap:22px;padding:56px 72px 0"><img src="${svgUrl(logo(true, 96))}" width="96" height="96">

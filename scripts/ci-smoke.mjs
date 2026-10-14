@@ -14,7 +14,7 @@ for (const host of ['claude-code', 'codex']) {
   const shell = host === 'codex' && isWindows ? ['pwsh', ['-NoProfile', '-Command', line]] : ['bash', ['-c', line]];
   const out = spawnSync(shell[0], shell[1], { encoding: 'utf8' });
   const result = `${out.stdout}${out.stderr}`.trim();
-  const ok = out.status === 0 && /^(UP-TO-DATE|UPDATED|OFFLINE):/m.test(result);
+  const ok = out.status === 0 && /^UP-TO-DATE:/m.test(result);
   console.log(`${ok ? '✓' : '✗'} ${host} (${shell[0]}): ${line}\n    → ${result || `exit ${out.status}`}`);
   if (!ok) failed = true;
 }

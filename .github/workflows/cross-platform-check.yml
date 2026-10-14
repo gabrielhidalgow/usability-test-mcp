@@ -37,6 +37,8 @@ jobs:
       - name: Generated slash commands run their update check in the host's shell
         run: node scripts/ci-smoke.mjs
         env:
+          # Pin "latest" to this commit so the check tests the shell, not a reinstall from GitHub.
+          USABILITY_TEST_LATEST: ${{ github.sha }}
           CLAUDE_CONFIG_DIR: ${{ runner.temp }}/claude
           CODEX_HOME: ${{ runner.temp }}/codex
       - name: doctor (clean-participant checks fail here because CI is not logged in)

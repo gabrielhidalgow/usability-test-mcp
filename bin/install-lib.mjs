@@ -37,7 +37,8 @@ const hash = text => createHash('sha256').update(text).digest('hex');
 /** Fills the command template for one host. Conditional blocks: {{#claude}}…{{/claude}}, {{#codex}}…{{/codex}}. */
 export async function renderCommand(host, { cli, dir, flavor = 'posix' }) {
   const meta = COMMAND_HOSTS[host];
-  let text = await readFile(join(packageRoot, 'assets', 'usability-test.command.md'), 'utf8');
+  // Normalise line endings: a Windows checkout may have CRLF, which would break the front matter.
+  let text = (await readFile(join(packageRoot, 'assets', 'usability-test.command.md'), 'utf8')).replace(/\r\n/g, '\n');
   for (const block of ['claude', 'codex']) {
     const keep = (block === 'claude') === (host === 'claude-code');
     text = text.replace(new RegExp(`\\{\\{#${block}\\}\\}([\\s\\S]*?)\\{\\{/${block}\\}\\}`, 'g'), keep ? '$1' : '');

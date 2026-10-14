@@ -23,8 +23,10 @@ export function claudeDesktopConfigPath() {
 export function shimScript(cmdPath, read = readFileSync) {
   let text;
   try { text = read(cmdPath, 'utf8'); } catch { return null; }
-  const match = /%~?dp0%?\\?(node_modules\\[^"\r\n]+?\.(?:c|m)?js)/i.exec(text);
-  return match ? resolve(dirname(cmdPath), match[1]) : null;
+  // npm.cmd also names npm-prefix.js before npm-cli.js; the entry point is the *-cli.js script when there is one.
+  const scripts = [...text.matchAll(/%~?dp0%?\\?(node_modules\\[^"\r\n]+?\.(?:c|m)?js)/gi)].map(m => m[1]);
+  const script = scripts.find(s => /-cli\.(?:c|m)?js$/i.test(s)) ?? scripts.at(-1);
+  return script ? resolve(dirname(cmdPath), script) : null;
 }
 
 function whereExe(command) {

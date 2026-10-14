@@ -9,7 +9,8 @@ import { participantMain, ParticipantError } from '../../bin/participant.mjs';
 
 // The tail of the wrapper npm writes for a global package on Windows (cmd-shim).
 const GLOBAL_SHIM = (script) => `@ECHO off\r\nGOTO start\r\n:find_dp0\r\nSET dp0=%~dp0\r\nEXIT /b\r\n:start\r\nSETLOCAL\r\nCALL :find_dp0\r\n\r\nIF EXIST "%dp0%\\node.exe" (\r\n  SET "_prog=%dp0%\\node.exe"\r\n) ELSE (\r\n  SET "_prog=node"\r\n  SET PATHEXT=%PATHEXT:;.JS;=;%\r\n)\r\n\r\nendLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\\${script}" %*\r\n`;
-const NPM_CMD = ':: Created by npm\r\n@ECHO OFF\r\nSETLOCAL\r\nSET "NODE_EXE=%~dp0\\node.exe"\r\nSET "NPM_CLI_JS=%~dp0\\node_modules\\npm\\bin\\npm-cli.js"\r\n"%NODE_EXE%" "%NPM_CLI_JS%" %*\r\n';
+// npm 10's npm.cmd names npm-prefix.js first, then npm-cli.js.
+const NPM_CMD = ':: Created by npm\r\n@ECHO OFF\r\nSETLOCAL\r\nSET "NODE_EXE=%~dp0\\node.exe"\r\nSET "NPM_PREFIX_JS=%~dp0\\node_modules\\npm\\bin\\npm-prefix.js"\r\nSET "NPM_CLI_JS=%~dp0\\node_modules\\npm\\bin\\npm-cli.js"\r\nFOR /F "delims=" %%F IN (\'CALL "%NODE_EXE%" "%NPM_PREFIX_JS%"\') DO (SET "NPM_PREFIX_NPM_CLI_JS=%%F\\node_modules\\npm\\bin\\npm-cli.js")\r\n"%NODE_EXE%" "%NPM_CLI_JS%" %*\r\n';
 
 test('Windows npm wrappers are read to find the real script, so no shell is needed', () => {
   const read = text => () => text;
@@ -47,6 +48,8 @@ test('Windows: an npm-style .cmd wrapper runs with arguments intact (spaces, quo
     const out = spawnCommandSync(join(dir, 'fake-cli.cmd'), args, { encoding: 'utf8' });
     assert.equal(out.status, 0, out.stderr);
     assert.deepEqual(JSON.parse(out.stdout), args);
-    assert.equal(spawnCommandSync('npm', ['--version'], { encoding: 'utf8' }).status, 0, 'npm.cmd starts without a shell');
+    const npm = spawnCommandSync('npm', ['--version'], { encoding: 'utf8' });
+    assert.equal(npm.status, 0, 'npm.cmd starts without a shell');
+    assert.match(npm.stdout.trim(), /^\d+\.\d+\.\d+$/, 'and runs npm itself, not its prefix helper');
   } finally { await rm(dir, { recursive: true, force: true }); }
 });

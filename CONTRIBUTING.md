@@ -20,7 +20,8 @@ Useful scripts:
 | --- | --- |
 | `npm run demo` | Runs three participants against the fixture with the deterministic test double and prints the report paths |
 | `npm run fixture` | Serves the fixture site on `http://127.0.0.1:4173` |
-| `npm run readme-assets` | Regenerates the README images in `docs/assets/` |
+| `npm run readme-assets` | Regenerates the README images in `docs/assets/` and the video stills in `video/assets/` |
+| `cd video && npm run render` | Renders the README loop with [HyperFrames](https://hyperframes.heygen.com); then rebuild `docs/assets/cursor-loop.webp` from the MP4 (15 fps, 960 px, `img2webp -loop 0 -d 67 -lossy -q 72`) |
 | `node bin/usability-test-mcp.mjs setup --host claude-code --dir /tmp/um` | Installs your working copy into a throwaway folder |
 
 ## Rules that keep the tests honest

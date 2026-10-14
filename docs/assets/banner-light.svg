@@ -1,12 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="280" viewBox="0 0 1280 280" role="img" aria-label="Usability Test MCP">
-  <rect width="1280" height="280" fill="#ffffff"/>
-  <g transform="translate(96 70)">
-    <rect width="140" height="140" rx="32" fill="#f6f8fa" stroke="#d1d9e0"/>
-    <rect x="28" y="34" width="84" height="60" rx="8" fill="none" stroke="#1f2328" stroke-width="6"/>
-    <line x1="28" y1="50" x2="112" y2="50" stroke="#1f2328" stroke-width="6"/>
-    <circle cx="92" cy="92" r="20" fill="#ffb00033" stroke="#ffb000" stroke-width="6"/>
-    <path d="M84 84 L84 118 L93 109 L100 124 L107 121 L100 106 L112 106 Z" fill="#1f2328" stroke="#ffffff" stroke-width="3" stroke-linejoin="round"/>
-  </g>
-  <text x="280" y="138" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="58" font-weight="700" fill="#1f2328">Usability Test MCP</text>
-  <text x="282" y="190" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="26" fill="#59636e">Usability tests for websites, localhost and Figma flows, from Claude Code and Codex</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="260" viewBox="0 0 1280 260" role="img" aria-label="Usability Test MCP">
+  <rect width="1280" height="260" fill="#ffffff"/>
+  <g transform="translate(92 50) scale(2)"><rect x="9" y="52" width="14" height="14" rx="3.5" fill="#2563eb"/><circle cx="27.5" cy="54.5" r="1.9" fill="#2563eb"/><circle cx="32" cy="51" r="1.9" fill="#2563eb"/><circle cx="36.5" cy="47.5" r="1.9" fill="#2563eb"/>
+  <rect x="38" y="32" width="14" height="14" rx="3.5" fill="#2563eb"/><circle cx="55" cy="33" r="1.9" fill="#2563eb"/>
+  <path transform="translate(47 4) scale(1.75) translate(-50.2 -16.7)" d="m63.36 23.43-11.42-6.54c-0.93-0.54-2.01 0.29-1.71 1.35l3.09 11.88c0.3 1.07 1.65 1.27 2.26 0.36l1.19-1.89c0.06-0.11 0.2-0.11 0.27 0l2.31 3.62c0.45 0.7 1.37 0.91 2.09 0.51l0.37-0.21c0.78-0.45 1.02-1.45 0.54-2.21l-2.33-3.71c-0.08-0.11-0.02-0.25 0.11-0.28l2.91-0.58c1.15-0.35 1.32-1.78 0.32-2.3z" fill="#1f2328"/></g>
+  <text x="290" y="128" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="60" font-weight="700" letter-spacing="-1.2" fill="#1f2328">Usability Test <tspan fill="#2563eb">MCP</tspan></text>
+  <text x="292" y="178" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="25" fill="#59636e">Usability tests for websites, localhost and Figma flows, from Claude Code and Codex</text>
 </svg>

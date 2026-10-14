@@ -10,3 +10,8 @@ dist/
 *.tgz
 
 output/playwright/
+
+# HyperFrames video build output
+video/renders/
+video/.hyperframes/
+video/.thumbnails/

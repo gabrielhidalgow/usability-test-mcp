@@ -25,7 +25,10 @@
   <a href="#docs">Docs</a>
 </p>
 
-![A synthetic participant clicking through a demo product in a visible browser, next to the short report it produced](docs/assets/demo.png)
+<p align="center">
+  <img src="docs/assets/cursor-loop.webp" alt="A synthetic participant's cursor on the Little Ledger demo product: it hesitates, clicks Options and an issue is flagged in red (pricing is labelled Options), then clicks Try this plan, marked green, ending with Task completed and 1 issue found" width="100%">
+  <br><sub>A participant working through the built-in demo product: one issue found, task completed. Animated from real screenshots of the demo; not real research.</sub>
+</p>
 
 ## Highlights
 
@@ -72,7 +75,7 @@ More options: [docs/INSTALL.md](docs/INSTALL.md).
 
 A short `report.md` for decisions and a full `details.md` with every step, screenshot and limitation.
 
-<img src="docs/assets/demo-report.png" alt="Executive report from the demo product: task, outcome, first action and participant table" width="640">
+![The visible browser with the participant's pointer and status badge, next to the short report it produced](docs/assets/demo.png)
 
 <details>
 <summary>Report outline</summary>
@@ -83,7 +86,7 @@ A short `report.md` for decisions and a full `details.md` with every step, scree
 4. **What worked:** things to keep.
 5. **Evidence limits and next check.**
 
-See [docs/REPORT_TEMPLATE.md](docs/REPORT_TEMPLATE.md).
+See [a full demo report](docs/assets/demo-report.png) and [docs/REPORT_TEMPLATE.md](docs/REPORT_TEMPLATE.md).
 </details>
 
 The images above come from the built-in demo product and a deterministic test participant (`npm run readme-assets`), not real research.

@@ -26,7 +26,7 @@ Use `--host claude-code` or `--host codex` for only one of them. The command:
 
 Restart Claude Code or Codex afterwards (or reconnect with `/mcp`).
 
-**Pinned version:** add a tag or commit, for example `github:gabrielhidalgow/usability-test-mcp#v0.13.1`.
+**Pinned version:** add a tag or commit, for example `github:gabrielhidalgow/usability-test-mcp#v0.13.2`.
 
 **Other hosts:** `--host claude-desktop` (macOS) merges the server into Claude Desktop's config with a backup. `--host manual` prints the configuration for any other local MCP host. The old `--host claude` alias still means Claude Desktop.
 

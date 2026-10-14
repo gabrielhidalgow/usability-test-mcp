@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1280, height=720" />
+    <title>Usability Test MCP: cursor close-up</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      :root {
+        --blue: #2563eb;
+        --blue-deep: #1d4ed8;
+        --halo: rgba(37, 99, 235, 0.28);
+        --red: #dc2626;
+        --red-halo: rgba(220, 38, 38, 0.26);
+        --green: #15803d;
+        --green-halo: rgba(21, 128, 61, 0.26);
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1280px; height: 720px; overflow: hidden; background: #f6f8fa; }
+      #root { position: relative; width: 1280px; height: 720px; overflow: hidden; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      #shot { position: absolute; inset: 0; }
+      /* Camera: translate(x,y) scale(s) with origin 0 0 maps page point P to x + s*P on screen. */
+      #cam { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; }
+      .page { position: absolute; inset: 0; width: 1280px; height: 720px; z-index: 0; }
+      #p-plans, #p-start { opacity: 0; visibility: hidden; }
+      .page img { width: 1280px; height: 720px; display: block; }
+      /* Click effects and cursor always sit above every page. */
+      .fx { position: absolute; left: 0; top: 0; z-index: 10; pointer-events: none; }
+      .halo { width: 32px; height: 32px; margin: -16px 0 0 -16px; border-radius: 50%; background: var(--halo); border: 0; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9); opacity: 0; }
+      .halo.red { background: var(--red-halo); } .halo.green { background: var(--green-halo); }
+      .ring.red { border-color: var(--red); } .ring.green { border-color: var(--green); }
+      .ring { width: 36px; height: 36px; margin: -18px 0 0 -18px; border-radius: 50%; border: 2.5px solid var(--blue); box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.85); opacity: 0; }
+      #cursor { width: 24px; height: 24px; transform-origin: 2px 2px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35)); z-index: 11; }
+      .callout { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 10px; white-space: nowrap; color: #fff; font-weight: 650; font-size: 19px; border-radius: 12px; padding: 10px 16px; box-shadow: 0 14px 34px rgba(13, 17, 23, 0.25); opacity: 0; z-index: 20; }
+      .callout i { width: 24px; height: 24px; border-radius: 12px; background: rgba(255, 255, 255, 0.24); display: grid; place-items: center; font-style: normal; font-size: 14px; }
+      .callout::before { content: ""; position: absolute; top: -7px; left: 50%; margin-left: -7px; width: 14px; height: 14px; background: inherit; transform: rotate(45deg); border-radius: 2px; }
+      .callout.red { background: var(--red); } .callout.green { background: var(--green); }
+      #chips { position: absolute; left: 0; right: 0; top: 88px; display: flex; gap: 12px; justify-content: center; z-index: 20; }
+      .chip { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 650; font-size: 18px; border-radius: 999px; padding: 11px 18px; box-shadow: 0 14px 34px rgba(13, 17, 23, 0.22); opacity: 0; }
+      .chip i { width: 24px; height: 24px; border-radius: 12px; background: rgba(255, 255, 255, 0.24); display: grid; place-items: center; font-style: normal; font-size: 14px; }
+      .chip.green { background: var(--green); } .chip.red { background: var(--red); }
+      #done { position: absolute; left: 50%; top: 92px; margin-left: -118px; width: 236px; display: flex; align-items: center; gap: 10px; justify-content: center; background: var(--blue-deep); color: #fff; font-weight: 650; font-size: 18px; border-radius: 999px; padding: 11px 18px; box-shadow: 0 14px 34px rgba(29, 78, 216, 0.35); opacity: 0; }
+      #done i { width: 24px; height: 24px; border-radius: 12px; background: rgba(255, 255, 255, 0.22); display: grid; place-items: center; font-style: normal; font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <div data-hf-id="hf-nu7b" id="root" data-composition-id="main" data-start="0" data-width="1280" data-height="720" data-duration="9">
+      <section data-hf-id="hf-zv5o" id="shot" class="clip" data-start="0" data-duration="9" data-track-index="0">
+        <div data-hf-id="hf-kgyx" id="cam" data-layout-allow-overflow="true">
+          <div data-hf-id="hf-qsaf" class="page" id="p-home"><img data-hf-id="hf-gbvy" src="assets/home.png" alt="" /></div>
+          <div data-hf-id="hf-663e" class="page" id="p-plans"><img data-hf-id="hf-7k2r" src="assets/plans.png" alt="" /></div>
+          <div data-hf-id="hf-nguu" class="page" id="p-start"><img data-hf-id="hf-awt3" src="assets/start.png" alt="" /></div>
+          <div data-hf-id="hf-tibt" class="fx halo red" id="halo1"></div>
+          <div data-hf-id="hf-xgfu" class="fx halo green" id="halo2"></div>
+          <div data-hf-id="hf-6xte" class="fx ring red" id="r1a"></div>
+          <div data-hf-id="hf-s3hr" class="fx ring green" id="r2a"></div>
+          <svg data-hf-id="hf-qo9l" class="fx" id="cursor" viewBox="0 0 22 22" aria-hidden="true">
+            <path data-hf-id="hf-10z9" d="M2 2 L2 18 L6.5 14 L9.6 20.4 L12.6 19 L9.6 12.8 L15.6 12.8 Z" fill="#fff" stroke="#0d1117" stroke-width="1.6" stroke-linejoin="round" />
+          </svg>
+        </div>
+        <div class="callout red" id="c1"><i>!</i>Issue: pricing is labelled “Options”</div>
+        <div class="callout green" id="c2"><i>✓</i>Found the plan</div>
+        <div id="chips"><div class="chip green" id="chip-ok"><i>✓</i>Task completed</div><div class="chip red" id="chip-issue"><i>!</i>1 issue found</div></div>
+      </section>
+    </div>
+    <script>
+      // Measured from the real demo page at 1280x720 (assets/targets.json).
+      const OPTIONS = { x: 369, y: 45, width: 57, height: 25 };
+      const TRY = { x: 243, y: 528, width: 319, height: 48 };
+      const REST = { x: 860, y: 430 };
+      const W = 1280, H = 720;
+      // Camera that centres page point P at scale s, clamped so the page always covers the frame.
+      const cam = (px, py, s) => ({
+        x: Math.min(0, Math.max(W - W * s, W / 2 - s * px)),
+        y: Math.min(0, Math.max(H - H * s, H / 2 - s * py)),
+        scale: s,
+      });
+      const tl = gsap.timeline({ paused: true });
+      const wide = cam(W / 2, H / 2, 1);
+
+      // A visible but calm click: soft halo under the pointer, a small press and one ring.
+      function click(t, target, n) {
+        tl.set([`#halo${n}`, `#r${n}a`], { x: target.x, y: target.y }, 0);
+        tl.fromTo(`#halo${n}`, { scale: 0.2, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.14, ease: "power2.out", immediateRender: false }, t - 0.06);
+        tl.to(`#halo${n}`, { scale: 1.5, opacity: 0, duration: 0.35, ease: "power2.in" }, t + 0.3);
+        tl.to("#cursor", { scale: 0.8, duration: 0.1, ease: "power2.in", yoyo: true, repeat: 1 }, t);
+        tl.fromTo(`#r${n}a`, { scale: 0.5, opacity: 0.9 }, { scale: 1.9, opacity: 0, duration: 0.6, ease: "power2.out", immediateRender: false }, t + 0.02);
+      }
+
+      // Screen position of page point P under camera c, for callouts that stay crisp outside the zoom.
+      const toScreen = (c, p) => ({ x: c.x + c.scale * p.x, y: c.y + c.scale * p.y });
+      function callout(id, c, target, t, hold) {
+        const p = toScreen(c, target);
+        const below = p.y + (c.scale * target.height) / 2 + 22;
+        tl.set(id, { x: p.x, y: below, xPercent: -50 }, 0);
+        tl.fromTo(id, { autoAlpha: 0, y: below + 10, scale: 0.94 }, { autoAlpha: 1, y: below, scale: 1, duration: 0.3, ease: "back.out(1.7)", immediateRender: false }, t);
+        tl.to(id, { autoAlpha: 0, duration: 0.25, ease: "power1.in" }, t + hold);
+      }
+      const FEATURES = { x: 281, y: 45 };
+      const camOptions = cam(OPTIONS.x - 20, 170, 2.2);
+      const camTry = cam(TRY.x + 90, TRY.y - 40, 2.0);
+
+      tl.set("#cam", wide, 0);
+      tl.set("#cursor", { x: REST.x, y: REST.y, scale: 1 }, 0);
+      tl.set(".halo, .ring", { opacity: 0 }, 0);
+
+      // Beat 1: the participant hesitates over "Features", then clicks "Options": an issue, in red.
+      tl.to("#cam", { ...camOptions, duration: 1.25, ease: "power3.inOut" }, 0.45);
+      tl.to("#cursor", { x: FEATURES.x, y: FEATURES.y, duration: 1.0, ease: "power3.inOut" }, 0.5);
+      tl.to("#cursor", { x: OPTIONS.x, y: OPTIONS.y, duration: 0.5, ease: "power2.inOut" }, 1.85);
+      click(2.45, OPTIONS, 1);
+      callout("#c1", camOptions, OPTIONS, 2.55, 1.0);
+
+      // Beat 2: the plans page; "Try this plan" works, in green.
+      tl.to("#p-plans", { autoAlpha: 1, duration: 0.25, ease: "power1.inOut" }, 3.6);
+      tl.to("#cam", { ...camTry, duration: 1.2, ease: "power3.inOut" }, 3.65);
+      tl.to("#cursor", { x: TRY.x, y: TRY.y, duration: 1.05, ease: "power3.inOut" }, 3.75);
+      click(4.95, TRY, 2);
+      callout("#c2", camTry, TRY, 5.05, 0.85);
+
+      // Beat 3: setup page, pull back, the outcome: task completed, one issue found.
+      tl.to("#p-start", { autoAlpha: 1, duration: 0.25, ease: "power1.inOut" }, 6.0);
+      tl.to("#cam", { ...cam(560, 330, 1.15), duration: 0.9, ease: "power3.inOut" }, 6.0);
+      tl.to("#cursor", { x: 300, y: 545, duration: 0.9, ease: "power3.inOut" }, 6.0);
+      tl.fromTo(["#chip-ok", "#chip-issue"], { autoAlpha: 0, y: -14, scale: 0.92 }, { autoAlpha: 1, y: 0, scale: 1, duration: 0.4, ease: "back.out(1.6)", stagger: 0.18, immediateRender: false }, 6.45);
+
+      // Return to the opening frame so 9 s matches 0 s.
+      tl.to(["#chip-ok", "#chip-issue"], { autoAlpha: 0, y: -10, duration: 0.3, ease: "power2.in" }, 7.65);
+      tl.set("#p-home", { zIndex: 3 }, 7.75);
+      tl.fromTo("#p-home", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4, ease: "power1.inOut", immediateRender: false }, 7.75);
+      tl.to("#cam", { ...wide, duration: 0.95, ease: "power3.inOut" }, 7.75);
+      tl.to("#cursor", { x: REST.x, y: REST.y, duration: 0.95, ease: "power3.inOut" }, 7.75);
+      tl.set(["#p-plans", "#p-start"], { autoAlpha: 0 }, 8.8);
+      tl.set("#p-home", { zIndex: 0 }, 8.8);
+      tl.to({}, { duration: 0.01 }, 8.99);
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

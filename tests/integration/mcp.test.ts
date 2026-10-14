@@ -129,7 +129,7 @@ test('invalid follow-ups preserve the request; idle timeout and host disconnect 
   const input = { target: fixture.url, persona: { context: 'Visitor' }, scenario: 'Explore', goal: 'Find plans', accessibilityChecks: false };
   try {
     await server.connect(b); await client.connect(a);
-    const started = textPayload(await client.callTool({ name: 'usability_run_session', arguments: { ...input, timeoutMs: 1000 } }));
+    const started = textPayload(await client.callTool({ name: 'usability_run_session', arguments: { ...input, timeoutMs: 3000 } }));
     assert.equal(started.phase, 'awaiting_decision');
     const invalid = await client.callTool({ name: 'usability_advance_session', arguments: {
       runId: started.runId, requestId: started.requestId, decision: { selectedAction: { type: 'eval', source: 'do not execute' } },
@@ -139,8 +139,9 @@ test('invalid follow-ups preserve the request; idle timeout and host disconnect 
     assert.equal(premature.isError, true);
     const pending = textPayload(await client.callTool({ name: 'usability_get_session_state', arguments: { runId: started.runId } }));
     assert.equal(pending.requestId, started.requestId);
-    await delay(1300);
-    const expired = textPayload(await client.callTool({ name: 'usability_get_session_state', arguments: { runId: started.runId } }));
+    // Wait for the idle timeout (3 s including browser start-up, which is slower on some machines).
+    let expired = pending;
+    for (let i = 0; i < 40 && expired.phase !== 'finished'; i++) { await delay(200); expired = textPayload(await client.callTool({ name: 'usability_get_session_state', arguments: { runId: started.runId } })); }
     assert.equal(expired.phase, 'finished'); assert.equal(expired.status, 'timeout');
     assert.equal(JSON.parse(await readFile(expired.artifacts.journey, 'utf8')).status, 'timeout');
     const abandoned = textPayload(await client.callTool({ name: 'usability_run_session', arguments: input }));

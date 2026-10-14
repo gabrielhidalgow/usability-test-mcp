@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { chmod, copyFile, readdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { DriverStartConfig, ProductDriver } from '../product-driver.js';
 import type { ActionResult, EvidenceArtifact, ProductObservation } from '../../core/types.js';
@@ -58,7 +58,8 @@ export class MaestroProductDriver implements ProductDriver {
     const name = `capture-${randomUUID()}`;
     await this.flow([{ takeScreenshot: { path: name } }]);
     const files = await readdir(this.config!.directory, { recursive: true });
-    const generated = files.find(file => file === `${name}.png` || file.endsWith(`/${name}.png`));
+    // readdir returns platform separators (\\ on Windows), so compare the file name only.
+    const generated = files.find(file => basename(file) === `${name}.png`);
     if (!generated) throw new Error('Maestro did not produce the expected screenshot artifact.');
     await copyFile(join(this.config!.directory, generated), path);
     await chmod(path, 0o600);

@@ -1,11 +1,11 @@
 // Runs one synthetic participant as a separate headless host process with no project context:
 // an empty working directory, only the usability MCP, and no file, web, agent or messaging tools.
-import { spawn } from 'node:child_process';
-import { mkdtemp, mkdir, readdir, readFile, rm, symlink, writeFile, unlink } from 'node:fs/promises';
+import { copyFile, link, mkdtemp, mkdir, readdir, readFile, rm, symlink, writeFile, unlink } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { defaultInstallDir, spawnCommand } from './platform.mjs';
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const START_TOOLS = ['usability_run_project', 'usability_quick_test', 'usability_test_prototype', 'usability_run_native'];
@@ -91,7 +91,11 @@ async function isolationDir(host, artifacts, serverPath) {
     // A private CODEX_HOME holding only a link to the login: no other MCP servers, plugins, memories or AGENTS.md.
     const home = join(root, 'codex-home'); await mkdir(home, { mode: 0o700 });
     const auth = join(process.env.CODEX_HOME ?? join(homedir(), '.codex'), 'auth.json');
-    if (existsSync(auth)) await symlink(auth, join(home, 'auth.json'));
+    // Windows only allows symlinks with Developer Mode; a hard link (same drive) or a short-lived copy also works.
+    if (existsSync(auth)) {
+      const target = join(home, 'auth.json');
+      try { await symlink(auth, target); } catch { try { await link(auth, target); } catch { await copyFile(auth, target); } }
+    }
     const toml = s => JSON.stringify(s);
     await writeFile(join(home, 'config.toml'), [`approval_policy = "never"`, `[mcp_servers.usability]`, `command = ${toml(server.command)}`, `args = [${server.args.map(toml).join(', ')}]`,
       `env = { ${Object.entries(env).map(([k, v]) => `${k} = ${toml(v)}`).join(', ')} }`,
@@ -110,7 +114,7 @@ function invoke(host, dir, prompt, { hostBin, timeoutMs }) {
   const call = hostInvocation(host, dir, prompt, hostBin);
   return new Promise(resolvePromise => {
     // stdin closed: codex exec otherwise waits for more input.
-    const child = spawn(call.command, call.args, { cwd: call.cwd, env: call.env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawnCommand(call.command, call.args, { cwd: call.cwd, env: call.env, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '', stderr = '';
     child.stdout.on('data', d => { stdout += d; }); child.stderr.on('data', d => { stderr += d; });
     const timer = setTimeout(() => child.kill('SIGTERM'), timeoutMs);
@@ -182,12 +186,14 @@ export async function participantMain(flags) {
   for (let i = 0; i < flags.length; i++) {
     const flag = flags[i];
     if (flag === '--check') { opts.check = true; continue; }
-    if (!['--host', '--start', '--artifacts', '--timeout-ms', '--terms', '--host-bin', '--server'].includes(flag) || flags[i + 1] === undefined) throw new ParticipantError('Usage: participant --host claude|codex --start \'{"tool":"usability_quick_test","arguments":{...}}\' [--check] [--terms "Name,domain"] [--artifacts DIR] [--timeout-ms N]');
+    if (!['--host', '--start', '--artifacts', '--timeout-ms', '--terms', '--host-bin', '--server'].includes(flag) || flags[i + 1] === undefined) throw new ParticipantError('Usage: participant --host claude|codex --start \'{"tool":"usability_quick_test","arguments":{...}}\' [--check] [--terms "Name,domain"] [--artifacts DIR] [--timeout-ms N]  (or --start @file.json)');
     opts[flag] = flags[++i];
   }
   let start;
-  try { start = JSON.parse(opts['--start'] ?? ''); } catch { throw new ParticipantError('--start must be JSON.'); }
-  const artifacts = resolve(opts['--artifacts'] ?? process.env.USABILITY_ARTIFACT_DIR ?? join(homedir(), '.local', 'share', 'usability-mcp', 'artifacts'));
+  // --start @file reads the JSON from a file (PowerShell can strip the quotes inside JSON arguments).
+  const raw = opts['--start']?.startsWith('@') ? await readFile(opts['--start'].slice(1), 'utf8').catch(() => { throw new ParticipantError(`Could not read ${opts['--start'].slice(1)}.`); }) : opts['--start'];
+  try { start = JSON.parse(raw ?? ''); } catch { throw new ParticipantError('--start must be JSON (or @path to a JSON file).'); }
+  const artifacts = resolve(opts['--artifacts'] ?? process.env.USABILITY_ARTIFACT_DIR ?? join(defaultInstallDir(), 'artifacts'));
   return runParticipant({ host: opts['--host'], start, artifacts, hostBin: opts['--host-bin'], serverPath: opts['--server'] ? resolve(opts['--server']) : undefined,
     extraTerms: (opts['--terms'] ?? '').split(','), timeoutMs: opts['--timeout-ms'] ? Number(opts['--timeout-ms']) : undefined, checkOnly: Boolean(opts.check) });
 }

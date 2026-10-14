@@ -57,7 +57,7 @@ test('update reinstalls the recorded hosts only when GitHub has a newer commit',
     assert.equal((await readFile(join(dir, 'installed-commit'), 'utf8')).trim(), 'a'.repeat(40), 'legacy marker kept for older update scripts');
     process.env.USABILITY_TEST_LATEST = 'a'.repeat(40);
     await main(['update', '--dir', dir]); assert.match(logs.pop(), /UP-TO-DATE: aaaaaaa/);
-    process.env.USABILITY_TEST_LATEST = 'b'.repeat(40); process.env.USABILITY_TEST_SETUP_CMD = `${process.execPath} ${join(dir, 'fake-setup.mjs')}`;
+    process.env.USABILITY_TEST_LATEST = 'b'.repeat(40); process.env.USABILITY_TEST_SETUP_CMD = JSON.stringify([process.execPath, join(dir, 'fake-setup.mjs')]);
     await main(['update', '--dir', dir]); assert.match(logs.pop(), /UPDATED: aaaaaaa -> bbbbbbb/);
     assert.equal((await readFile(record, 'utf8')).trim(), `setup --host claude-code,codex --dir ${dir} --commit ${'b'.repeat(40)}`);
   } finally { console.log = log; delete process.env.USABILITY_TEST_LATEST; delete process.env.USABILITY_TEST_SETUP_CMD; await rm(dir, { recursive: true, force: true }); }

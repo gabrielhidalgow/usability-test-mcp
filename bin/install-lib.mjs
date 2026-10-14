@@ -20,21 +20,29 @@ export function commandPath(host) {
   if (host === 'codex') return join(process.env.CODEX_HOME ?? join(homedir(), '.codex'), 'prompts', 'usability-test.md');
   return undefined;
 }
-const quote = value => (/^[\w./:@-]+$/.test(value) ? value : `"${value.replace(/(["\\$`])/g, '\\$1')}"`);
-/** The CLI of the installed copy, as a shell command prefix. */
-export const cliCommand = installedBin => `${quote(process.execPath)} ${quote(installedBin)}`;
+// Shell quoting for the generated command. Claude Code runs commands in bash (Git Bash on Windows);
+// Codex on Windows runs them in PowerShell. Windows paths use forward slashes, which both accept.
+const slashes = value => (process.platform === 'win32' ? value.replace(/\\/g, '/') : value);
+export function shellQuote(value, flavor = 'posix') {
+  const v = slashes(value);
+  if (flavor === 'powershell') return /^[\w./:@-]+$/.test(v) ? v : `'${v.replace(/'/g, "''")}'`;
+  return /^[\w./:@-]+$/.test(v) ? v : `"${v.replace(/(["\\$`])/g, '\\$1')}"`;
+}
+/** The CLI of the installed copy, as a shell command prefix (PowerShell needs & to run a quoted path). */
+export const cliCommand = (installedBin, flavor = 'posix') =>
+  `${flavor === 'powershell' ? '& ' : ''}${shellQuote(process.execPath, flavor)} ${shellQuote(installedBin, flavor)}`;
 
 const MARKER = /\n<!-- usability-test-mcp generated v([\w.-]+) sha256:([0-9a-f]{64}) -->\n?$/;
 const hash = text => createHash('sha256').update(text).digest('hex');
 /** Fills the command template for one host. Conditional blocks: {{#claude}}…{{/claude}}, {{#codex}}…{{/codex}}. */
-export async function renderCommand(host, { cli, dir }) {
+export async function renderCommand(host, { cli, dir, flavor = 'posix' }) {
   const meta = COMMAND_HOSTS[host];
   let text = await readFile(join(packageRoot, 'assets', 'usability-test.command.md'), 'utf8');
   for (const block of ['claude', 'codex']) {
     const keep = (block === 'claude') === (host === 'claude-code');
     text = text.replace(new RegExp(`\\{\\{#${block}\\}\\}([\\s\\S]*?)\\{\\{/${block}\\}\\}`, 'g'), keep ? '$1' : '');
   }
-  const values = { UPDATE: `${cli} update --dir ${quote(dir)}`, CLI: cli, RUNNER_HOST: meta.runner, LOGIN: meta.login, HOST_NAME: meta.name };
+  const values = { UPDATE: `${cli} update --dir ${shellQuote(dir, flavor)}`, CLI: cli, RUNNER_HOST: meta.runner, LOGIN: meta.login, HOST_NAME: meta.name };
   text = text.replace(/\{\{(\w+)\}\}/g, (_, key) => values[key] ?? '');
   return `${text}\n<!-- usability-test-mcp generated v${pkg.version} sha256:${hash(text)} -->\n`;
 }

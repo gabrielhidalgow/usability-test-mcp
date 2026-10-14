@@ -30,6 +30,9 @@ Use the `usability` MCP tools. No model API keys are needed: you, the connected 
 ## Clean participants (never in this chat, never a subagent)
 
 Participants must not run here or as subagents: those inherit this project's files, memory, other tools and other chats. Use the isolated runner, `R` = `{{CLI}} participant --host {{RUNNER_HOST}}`:
+{{#codex}}
+On Windows (PowerShell), write each start JSON to a temporary file and pass `--start @<file>` instead of inline JSON.
+{{/codex}}
 
 1. **Preflight before any scan or approval.** Run `R --check --start '<start JSON>'`. If it reports a login problem, stop and tell me to run `{{LOGIN}}` in a terminal. If it reports project knowledge, stop, show what leaked and offer: remove that source and retry, or an informed walkthrough run in this chat and labelled as such. Never claim a fresh context when isolation failed.
 2. **Pin IDs.** Use only the projectId, discoveryId, prototypeId and runId created in this chat. Never pick "the latest" from a list.

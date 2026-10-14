@@ -1,0 +1,48 @@
+# Manual check that install and tests work on Windows and Linux.
+# Runs only when started by hand (Actions → Cross-platform check → Run workflow); never on push.
+name: Cross-platform check
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: npm run check (types, tests with a real browser, build, installer tests)
+        run: npm run check
+      - name: Install the Claude Code and Codex CLIs (not logged in)
+        run: npm install -g @anthropic-ai/claude-code @openai/codex
+      - name: One-command setup for both hosts
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/claude" "$RUNNER_TEMP/codex"
+          node bin/usability-test-mcp.mjs setup --host claude-code,codex --dir "$RUNNER_TEMP/um" --commit "$(git rev-parse HEAD)"
+        env:
+          CLAUDE_CONFIG_DIR: ${{ runner.temp }}/claude
+          CODEX_HOME: ${{ runner.temp }}/codex
+      - name: Generated slash commands run their update check in the host's shell
+        run: node scripts/ci-smoke.mjs
+        env:
+          CLAUDE_CONFIG_DIR: ${{ runner.temp }}/claude
+          CODEX_HOME: ${{ runner.temp }}/codex
+      - name: doctor (clean-participant checks fail here because CI is not logged in)
+        shell: bash
+        continue-on-error: true
+        run: node bin/usability-test-mcp.mjs doctor --dir "$RUNNER_TEMP/um"
+        env:
+          CLAUDE_CONFIG_DIR: ${{ runner.temp }}/claude
+          CODEX_HOME: ${{ runner.temp }}/codex

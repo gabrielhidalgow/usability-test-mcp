@@ -32,11 +32,12 @@ const svgUrl = (svg: string) => `data:image/svg+xml;base64,${Buffer.from(svg).to
 
 function banner(dark: boolean) {
   const bg = dark ? '#0d1117' : '#ffffff', fg = dark ? PAPER : INK, sub = dark ? '#9198a1' : '#59636e', accent = dark ? BLUE_DARK : BLUE;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="260" viewBox="0 0 1280 260" role="img" aria-label="Usability Test MCP">
-  <rect width="1280" height="260" fill="${bg}"/>
-  <g transform="translate(92 50) scale(2)">${markShapes(fg, accent)}</g>
-  <text x="290" y="128" font-family="${FONT}" font-size="64" font-weight="400" letter-spacing="-3.2" fill="${fg}">Usability Test <tspan fill="${accent}">MCP</tspan></text>
-  <text x="293" y="180" font-family="${FONT}" font-size="27" letter-spacing="-0.5" fill="${sub}">Usability tests, right from your AI chat.</text>
+  // Centred, stacked lockup: text-anchor keeps it centred whichever fallback font the viewer has.
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="300" viewBox="0 0 1280 300" role="img" aria-label="Usability Test MCP">
+  <rect width="1280" height="300" fill="${bg}"/>
+  <g transform="translate(578 26) scale(1.6)">${markShapes(fg, accent)}</g>
+  <text x="640" y="212" text-anchor="middle" font-family="${FONT}" font-size="64" font-weight="400" letter-spacing="-3.2" fill="${fg}">Usability Test <tspan fill="${accent}">MCP</tspan></text>
+  <text x="640" y="260" text-anchor="middle" font-family="${FONT}" font-size="27" letter-spacing="-0.5" fill="${sub}">Usability tests, right from your AI chat.</text>
 </svg>\n`;
 }
 

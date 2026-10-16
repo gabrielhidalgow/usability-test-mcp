@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="260" viewBox="0 0 1280 260" role="img" aria-label="Usability Test MCP">
-  <rect width="1280" height="260" fill="#0d1117"/>
-  <g transform="translate(92 50) scale(2)"><rect x="9" y="52" width="14" height="14" rx="3.5" fill="#4c8dff"/><circle cx="27.5" cy="54.5" r="1.9" fill="#4c8dff"/><circle cx="32" cy="51" r="1.9" fill="#4c8dff"/><circle cx="36.5" cy="47.5" r="1.9" fill="#4c8dff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="300" viewBox="0 0 1280 300" role="img" aria-label="Usability Test MCP">
+  <rect width="1280" height="300" fill="#0d1117"/>
+  <g transform="translate(578 26) scale(1.6)"><rect x="9" y="52" width="14" height="14" rx="3.5" fill="#4c8dff"/><circle cx="27.5" cy="54.5" r="1.9" fill="#4c8dff"/><circle cx="32" cy="51" r="1.9" fill="#4c8dff"/><circle cx="36.5" cy="47.5" r="1.9" fill="#4c8dff"/>
   <rect x="38" y="32" width="14" height="14" rx="3.5" fill="#4c8dff"/><circle cx="55" cy="33" r="1.9" fill="#4c8dff"/>
   <path transform="translate(47 4) scale(1.75) translate(-50.2 -16.7)" d="m63.36 23.43-11.42-6.54c-0.93-0.54-2.01 0.29-1.71 1.35l3.09 11.88c0.3 1.07 1.65 1.27 2.26 0.36l1.19-1.89c0.06-0.11 0.2-0.11 0.27 0l2.31 3.62c0.45 0.7 1.37 0.91 2.09 0.51l0.37-0.21c0.78-0.45 1.02-1.45 0.54-2.21l-2.33-3.71c-0.08-0.11-0.02-0.25 0.11-0.28l2.91-0.58c1.15-0.35 1.32-1.78 0.32-2.3z" fill="#f0f6fc"/></g>
-  <text x="290" y="128" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="64" font-weight="400" letter-spacing="-3.2" fill="#f0f6fc">Usability Test <tspan fill="#4c8dff">MCP</tspan></text>
-  <text x="293" y="180" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="27" letter-spacing="-0.5" fill="#9198a1">Usability tests, right from your AI chat.</text>
+  <text x="640" y="212" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="64" font-weight="400" letter-spacing="-3.2" fill="#f0f6fc">Usability Test <tspan fill="#4c8dff">MCP</tspan></text>
+  <text x="640" y="260" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="27" letter-spacing="-0.5" fill="#9198a1">Usability tests, right from your AI chat.</text>
 </svg>

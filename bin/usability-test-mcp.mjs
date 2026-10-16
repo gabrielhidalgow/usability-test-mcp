@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { claudeDesktopConfigPath, defaultInstallDir, isWindows, spawnCommandSync } from './platform.mjs';
-import { COMMAND_HOSTS, cliCommand, commandPath, pkg, readState, removeCommand, renderCommand, sourceCommit, latestCommit, writeCommand, writeState } from './install-lib.mjs';
+import { COMMAND_HOSTS, licenceNotice, cliCommand, commandPath, pkg, readState, removeCommand, renderCommand, sourceCommit, latestCommit, writeCommand, writeState } from './install-lib.mjs';
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 function run(command, args, options = {}) {
@@ -130,7 +130,7 @@ export async function main(args) {
       } else lines.push(host === 'manual' ? 'Manual: add the configuration above to your MCP host.' : 'Claude Desktop: restart it and ask "Set up a usability test for https://your-site.com".');
     }
     await writeState(destination, { version: pkg.version, commit: sourceCommit(options['--commit']), hosts, installedAt: new Date().toISOString(), cli });
-    console.log(`\nDone. Usability Test MCP ${pkg.version} is installed.\n\n${lines.map(l => '  ' + l).join('\n')}\n\nReports stay on this computer in ${artifacts}. No model API keys are needed.\nCheck everything any time with:  ${cli} doctor`);
+    console.log(`\nDone. Usability Test MCP ${pkg.version} is installed.\n\n${lines.map(l => '  ' + l).join('\n')}\n\nReports stay on this computer in ${artifacts}. No model API keys are needed.\nCheck everything any time with:  ${cli} doctor\n\n${licenceNotice()}`);
   } finally { await rm(temp, { recursive: true, force: true }); }
 }
 

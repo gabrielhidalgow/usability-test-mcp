@@ -18,9 +18,14 @@
 </p>
 
 <p align="center">
+  Free for personal use · Using it at work? <a href="https://buy.stripe.com/aFabJ0ah3cf33V1acC87K02">US$49 commercial licence</a> · <a href="https://buy.stripe.com/eVq7sK0Gtcf3ezFgB087K03">☕ Buy me a coffee</a>
+</p>
+
+<p align="center">
   <a href="#quick-start">Quick start</a> ·
   <a href="#what-you-get">What you get</a> ·
   <a href="#how-it-works">How it works</a> ·
+  <a href="#licence-and-pricing">Licence</a> ·
   <a href="#faq">FAQ</a> ·
   <a href="#docs">Docs</a>
 </p>
@@ -37,7 +42,7 @@
 - 🧪 **Clean participants.** Each one runs as its own isolated process, without your project files, memory or other tools.
 - 🌐 **Test almost anything:** live sites, localhost, Figma links and (experimental) native apps.
 - 📝 **Reports you can act on.** At most three fixes, with the exact copy or design change and a screenshot for each.
-- 🔑 **No API keys.** It runs on your existing Claude or ChatGPT subscription; there is nothing extra to pay.
+- 🔑 **No API keys or API bills.** It runs on your existing Claude or ChatGPT subscription.
 
 ## Quick start
 
@@ -70,6 +75,14 @@ Add a goal in plain words if you like, for example `… find the monthly price`.
 5. You get a short report with its path, plus what to trust and what not to.
 
 More options: [docs/INSTALL.md](docs/INSTALL.md).
+
+## Licence and pricing
+
+- **Free** for personal projects, learning, research and non-profits ([PolyForm Noncommercial 1.0.0](LICENSE)).
+- **Using it at work** (a company, client work, or inside a product or service) needs a [commercial licence](COMMERCIAL.md): [US$49 one-time per company](https://buy.stripe.com/aFabJ0ah3cf33V1acC87K02).
+- Versions up to and including v0.14.x were released under MIT and remain MIT.
+
+Like it? [Buy me a coffee ☕](https://buy.stripe.com/eVq7sK0Gtcf3ezFgB087K03)
 
 ## What you get
 
@@ -202,10 +215,4 @@ If it saves you time, you can [buy me a coffee ☕](https://buy.stripe.com/eVq7s
 
 Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Run `npm run check` before opening a PR.
 
-## Licence and pricing
-
-- **Free** for personal projects, learning, research and non-profits ([PolyForm Noncommercial 1.0.0](LICENSE)).
-- **Using it at work** (a company, client work, or inside a product or service) needs a [commercial licence](COMMERCIAL.md): [US$49 one-time per company](https://buy.stripe.com/aFabJ0ah3cf33V1acC87K02).
-- Versions up to and including v0.14.x were released under MIT and remain MIT.
-
-© 2026 Gabriel Hidalgo
+© 2026 Gabriel Hidalgo · [Licence and pricing](#licence-and-pricing)

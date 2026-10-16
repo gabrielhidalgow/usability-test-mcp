@@ -28,7 +28,7 @@ Use `--host claude-code` or `--host codex` for only one of them. The command:
 4. installs the `/usability-test` command (Claude Code: `~/.claude/commands/usability-test.md`; Codex: `~/.codex/prompts/usability-test.md`, run as `/prompts:usability-test`);
 5. records what it installed in `install.json`.
 
-Restart Claude Code or Codex afterwards (or reconnect with `/mcp`).
+Restart Claude Code or Codex afterwards (or reconnect with `/mcp`). Setup ends with a short note about the [licence](../COMMERCIAL.md): free for personal use, US$49 one-time for work use. It never asks a question, so it's safe in scripts.
 
 **Pinned version:** add a tag or commit, for example `github:gabrielhidalgow/usability-test-mcp#v0.14.0`.
 

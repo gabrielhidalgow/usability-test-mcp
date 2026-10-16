@@ -10,6 +10,10 @@ import { fileURLToPath } from 'node:url';
 export const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const pkg = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'));
 export const REPO_URL = 'https://github.com/gabrielhidalgow/usability-test-mcp';
+export const LICENCE_URL = 'https://buy.stripe.com/aFabJ0ah3cf33V1acC87K02';
+export const COFFEE_URL = 'https://buy.stripe.com/eVq7sK0Gtcf3ezFgB087K03';
+/** Shown at the end of setup. Never a prompt: updates and scripted installs run setup unattended. */
+export const licenceNotice = () => `Free for personal use. Using it at work? Commercial licence (US$49, one-time): ${LICENCE_URL}\nLike it? Buy me a coffee: ${COFFEE_URL}`;
 export const COMMAND_HOSTS = {
   'claude-code': { runner: 'claude', name: 'Claude Code', login: 'claude /login', invoke: '/usability-test' },
   codex: { runner: 'codex', name: 'Codex', login: 'codex login', invoke: '/prompts:usability-test' },

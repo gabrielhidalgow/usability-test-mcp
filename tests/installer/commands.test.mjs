@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { renderCommand, writeCommand, removeCommand, isUnmodifiedGenerated, commandPath, writeState, commitFromLockfiles } from '../../bin/install-lib.mjs';
+import { renderCommand, writeCommand, removeCommand, isUnmodifiedGenerated, commandPath, writeState, commitFromLockfiles, licenceNotice, LICENCE_URL, COFFEE_URL } from '../../bin/install-lib.mjs';
 import { main } from '../../bin/usability-test-mcp.mjs';
 
 const cli = '/usr/bin/node /opt/usability/bin/usability-test-mcp.mjs';
@@ -72,4 +72,12 @@ test('an npx install from GitHub knows its commit, so the first run does not rei
     await writeFile(join(dir, 'package-lock.json'), JSON.stringify({ packages: { 'node_modules/usability-test-mcp': { resolved: `git+ssh://git@github.com/gabrielhidalgow/usability-test-mcp.git#${sha}` } } }));
     assert.equal(commitFromLockfiles(root), sha);
   } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('setup ends with a licence notice that links to the licence and coffee pages, without a prompt', () => {
+  const notice = licenceNotice();
+  assert.match(notice, /Free for personal use/);
+  assert.ok(notice.includes(LICENCE_URL) && notice.includes(COFFEE_URL));
+  assert.match(LICENCE_URL, /^https:\/\/buy\.stripe\.com\//);
+  assert.doesNotMatch(notice, /\?\s*\[|\(y\/n\)/i, 'no question to answer');
 });

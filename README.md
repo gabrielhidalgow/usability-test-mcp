@@ -30,10 +30,9 @@
   <a href="#docs">Docs</a>
 </p>
 
-<p align="center">
-  <img src="docs/assets/cursor-loop.webp" alt="A synthetic participant's cursor on the Little Ledger demo product: it hesitates, clicks Options and an issue is flagged in red (pricing is labelled Options), then clicks Try this plan, marked green, ending with Task completed and 1 issue found" width="100%">
-  <br><sub>A participant working through the built-in demo product: one issue found, task completed. Animated from real screenshots of the demo; not real research.</sub>
-</p>
+https://github.com/user-attachments/assets/798bf5b0-9b73-407f-9b58-bdf092c41989
+
+<p align="center"><sub>The 34-second intro (sound on). Product scenes use the built-in demo product; not real research.</sub></p>
 
 ## Highlights
 
@@ -105,6 +104,11 @@ See [a full demo report](docs/assets/demo-report.png) and [docs/REPORT_TEMPLATE.
 The images above come from the built-in demo product and a deterministic test participant (`npm run readme-assets`), not real research.
 
 ## How it works
+
+<p align="center">
+  <img src="docs/assets/cursor-loop.webp" alt="A synthetic participant's cursor on the Little Ledger demo product: it hesitates, clicks Options and an issue is flagged in red (pricing is labelled Options), then clicks Try this plan, marked green, ending with Task completed and 1 issue found" width="100%">
+  <br><sub>A participant working through the built-in demo product: one issue found, task completed. Animated from real screenshots of the demo; not real research.</sub>
+</p>
 
 ```mermaid
 flowchart LR

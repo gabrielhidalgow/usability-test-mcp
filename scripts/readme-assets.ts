@@ -14,7 +14,7 @@ import { startDemoSite } from './demo-site.js';
 const out = resolve('docs/assets');
 const videoAssets = resolve('video/assets');
 const FONT = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif";
-const BLUE = '#2563eb', BLUE_DARK = '#4c8dff', INK = '#1f2328', PAPER = '#f0f6fc';
+const BLUE = '#2563eb', BLUE_DARK = '#4c8dff', INK = '#0e1116', PAPER = '#f0f6fc';
 const PERSONA = 'First-time small business owner';
 
 // Logo: two screens joined by a dotted path, ending at a cursor (refined from a QuiverAI Arrow 2 draft).
@@ -35,14 +35,15 @@ function banner(dark: boolean) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="260" viewBox="0 0 1280 260" role="img" aria-label="Usability Test MCP">
   <rect width="1280" height="260" fill="${bg}"/>
   <g transform="translate(92 50) scale(2)">${markShapes(fg, accent)}</g>
-  <text x="290" y="128" font-family="${FONT}" font-size="60" font-weight="700" letter-spacing="-1.2" fill="${fg}">Usability Test <tspan fill="${accent}">MCP</tspan></text>
-  <text x="292" y="178" font-family="${FONT}" font-size="25" fill="${sub}">Usability tests for websites, localhost and Figma flows, from Claude Code and Codex</text>
+  <text x="290" y="128" font-family="${FONT}" font-size="64" font-weight="400" letter-spacing="-3.2" fill="${fg}">Usability Test <tspan fill="${accent}">MCP</tspan></text>
+  <text x="293" y="180" font-family="${FONT}" font-size="27" letter-spacing="-0.5" fill="${sub}">Usability tests, right from your AI chat.</text>
 </svg>\n`;
 }
 
 async function shot(page: Page, html: string, path: string, size: { width: number; height: number }) {
   await page.setViewportSize(size);
   await page.setContent(html, { waitUntil: 'load' });
+  await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path });
 }
 const dataUrl = async (path: string) => `data:image/png;base64,${(await readFile(path)).toString('base64')}`;
@@ -117,17 +118,27 @@ async function main() {
     ];
     await shot(page, `<body style="margin:0;${backdrop};padding:36px 44px;font-family:${FONT}">${label('✓', 'Figma flow: one frame at a time, each tap checked against the @tap target')}
       <div style="display:flex;gap:26px">${frames.join(arrow)}</div></body>`, join(out, 'demo-figma.png'), { width: 1180, height: 668 });
-    // 7. Social preview (upload in GitHub: Settings → Social preview).
-    await shot(page, `<body style="margin:0;width:1280px;height:640px;background:#0d1117;font-family:${FONT};overflow:hidden;position:relative">
-      <div style="display:flex;align-items:center;gap:22px;padding:56px 72px 0"><img src="${svgUrl(logo(true, 96))}" width="96" height="96">
-        <div><div style="font:700 54px ${FONT};letter-spacing:-.02em;color:${PAPER}">Usability Test <span style="color:${BLUE_DARK}">MCP</span></div>
-        <div style="font:400 23px ${FONT};color:#9198a1;margin-top:6px">Usability tests for websites, localhost and Figma flows</div></div></div>
-      <div style="position:absolute;left:72px;bottom:64px;color:${PAPER};font:600 30px/1.4 ${FONT}">Synthetic participants.<br>Real browser.<br>Evidence-backed reports.<div style="font:400 19px ${FONT};color:#9198a1;margin-top:14px">From Claude Code or Codex. No API keys.</div></div>
-      <div style="position:absolute;right:-90px;bottom:28px;width:720px">
-        <img src="${browserShot}" style="display:block;width:720px;border-radius:14px;border:1px solid #30363d">
-        <!-- The issue callout from the README video, anchored under "Options" (page point scaled 720/1280). -->
-        <div style="position:absolute;left:${Math.round(targets.options!.x * 720 / 1280)}px;top:${Math.round(targets.options!.y * 720 / 1280) + 22}px;transform:translateX(-50%);background:#dc2626;color:#fff;font:650 17px ${FONT};padding:9px 14px;border-radius:10px;white-space:nowrap;box-shadow:0 12px 30px #0006;display:flex;gap:8px;align-items:center"><span style="width:20px;height:20px;border-radius:10px;background:#ffffff3d;display:grid;place-items:center;font-size:12px">!</span>Issue: pricing is labelled “Options”</div>
-      </div></body>`, join(out, 'social-preview.png'), { width: 1280, height: 640 });
+    // 7. Social preview (upload in GitHub: Settings → Social preview), in the promo video's look:
+    // flat light canvas, regular-weight wordmark, a participant cursor and the issue it found. No gradients or shadows.
+    const home = await dataUrl(join(videoAssets, 'home.png'));
+    const W = 760, k = W / 1280, BAR = 44, ox = Math.round(targets.options!.x * k), oy = Math.round(targets.options!.y * k) + BAR;
+    const pointer = `<svg width="54" height="54" viewBox="0 0 22 22" aria-hidden="true"><path d="M2 2 L2 18 L6.5 14 L9.6 20.4 L12.6 19 L9.6 12.8 L15.6 12.8 Z" fill="${BLUE}" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
+    await shot(page, `<head><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=block"></head>
+      <body style="margin:0;width:1280px;height:640px;background:#e7eaf0;color:${INK};font-family:${FONT};overflow:hidden;position:relative">
+      <div style="position:absolute;left:76px;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;width:500px">
+        <img src="${svgUrl(logo(false, 104))}" width="104" height="104" style="margin:0 0 18px -10px">
+        <div style="font:400 78px/0.98 ${FONT};letter-spacing:-.05em">Usability<br>Test <span style="color:${BLUE}">MCP</span></div>
+        <div style="font:400 25px/1.3 ${FONT};letter-spacing:-.02em;color:#5b6472;margin-top:22px;white-space:nowrap">Usability tests, right from your AI chat.</div>
+        <div style="font:400 19px ${FONT};color:#5b6472;margin-top:34px">From Claude Code or Codex · No API keys</div>
+      </div>
+      <div style="position:absolute;left:590px;top:92px;width:${W}px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 0 0 1px rgba(14,17,22,.1)">
+        <div style="height:${BAR}px;display:flex;align-items:center;gap:8px;padding:0 16px">${['#ff5f57', '#febc2e', '#28c840'].map(c => `<i style="width:12px;height:12px;border-radius:50%;background:${c}"></i>`).join('')}<span style="margin:0 auto;transform:translateX(-26px);font:500 15px ${FONT};color:#5b6472">littleledger.test</span></div>
+        <img src="${home}" style="display:block;width:${W}px">
+      </div>
+      <!-- Participant 1's cursor on "Options" (page point scaled to the window) and the issue it found, as in the promo. -->
+      <div style="position:absolute;left:${590 + ox - 6}px;top:${92 + oy + 7}px">${pointer}<span style="position:absolute;left:38px;top:42px;background:${BLUE};color:#fff;font:500 19px ${FONT};padding:7px 14px;border-radius:999px;white-space:nowrap">Participant 1</span></div>
+      <div style="position:absolute;left:632px;top:478px;background:#dc2626;color:#fff;font:500 20px ${FONT};padding:11px 18px;border-radius:12px;white-space:nowrap;display:flex;gap:10px;align-items:center"><i style="width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.28);display:grid;place-items:center;font:normal 600 14px ${FONT}">!</i>Issue: pricing is labelled “Options”</div>
+      </body>`, join(out, 'social-preview.png'), { width: 1280, height: 640 });
     console.log(`README assets written to ${out}; video stills to ${videoAssets}`);
   } finally { await browser.close(); await site.close(); await rm(work, { recursive: true, force: true }); }
 }

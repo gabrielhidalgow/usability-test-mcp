@@ -1,6 +1,6 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/banner-dark.svg">
-  <img alt="Usability Test MCP" src="docs/assets/banner-light.svg" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/header-dark.svg">
+  <img alt="Usability Test MCP" src="docs/assets/header-light.svg" width="100%">
 </picture>
 
 <p align="center">

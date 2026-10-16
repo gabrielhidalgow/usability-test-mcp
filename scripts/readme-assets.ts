@@ -62,8 +62,8 @@ async function main() {
   await mkdir(out, { recursive: true }); await mkdir(videoAssets, { recursive: true });
   await writeFile(join(out, 'logo.svg'), logo());
   await writeFile(join(out, 'logo-dark.svg'), logo(true));
-  await writeFile(join(out, 'banner-light.svg'), banner(false));
-  await writeFile(join(out, 'banner-dark.svg'), banner(true));
+  await writeFile(join(out, 'header-light.svg'), banner(false));
+  await writeFile(join(out, 'header-dark.svg'), banner(true));
   const work = await mkdtemp(join(tmpdir(), 'readme-assets-'));
   const site = await startDemoSite();
   const browser = await chromium.launch();

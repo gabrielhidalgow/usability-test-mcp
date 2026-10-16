@@ -44,3 +44,7 @@ Behaviour changes should start from the [build brief](docs/design/BUILD_BRIEF.md
 - Keep each PR to one change, with a test.
 - Use plain words in user-facing text.
 - Describe what you checked by hand (for example a real site or Figma file), without sharing private data.
+
+## Licensing of contributions
+
+The project is free for noncommercial use ([PolyForm Noncommercial](LICENSE)) and sold under a [commercial licence](COMMERCIAL.md) for work use. By opening a pull request you agree that your contribution can be distributed under both: the noncommercial licence and the author's commercial licences. You keep the copyright to your contribution.

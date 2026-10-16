@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-blue"></a>
+  <a href="COMMERCIAL.md"><img alt="Free for noncommercial use" src="https://img.shields.io/badge/licence-PolyForm%20Noncommercial-blue"></a>
   <a href="https://github.com/gabrielhidalgow/usability-test-mcp/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/gabrielhidalgow/usability-test-mcp"></a>
   <img alt="Node 22+" src="https://img.shields.io/badge/node-%E2%89%A522-339933">
   <a href="https://modelcontextprotocol.io"><img alt="MCP server" src="https://img.shields.io/badge/MCP-server-6e56cf"></a>
@@ -142,7 +142,9 @@ See [docs/SAFETY.md](docs/SAFETY.md) for browser safety and limits.
 <details>
 <summary><b>What does it cost?</b></summary>
 
-Nothing beyond the Claude or ChatGPT subscription you already use with Claude Code or Codex. There are no API keys and no separate billing. Tests count towards your plan's normal usage.
+It's free for personal and noncommercial use. Using it at work (for a company, clients or a product) needs a [one-time commercial licence](COMMERCIAL.md) of US$49 per company.
+
+Running tests uses the Claude or ChatGPT subscription you already have with Claude Code or Codex, with no API keys and no separate billing. Tests count towards your plan's normal usage.
 </details>
 
 <details>
@@ -194,10 +196,16 @@ Made by [Gabriel Hidalgo](https://gabrielhidalgo.design/), a product designer. I
 
 [gabrielhidalgo.design](https://gabrielhidalgo.design/) · [X @ghidalgodesign](https://x.com/ghidalgodesign) · [GitHub](https://github.com/gabrielhidalgow)
 
+If it saves you time, you can [buy me a coffee ☕](https://buy.stripe.com/eVq7sK0Gtcf3ezFgB087K03).
+
 ## Contributing
 
 Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Run `npm run check` before opening a PR.
 
-## Licence
+## Licence and pricing
 
-[MIT](LICENSE) © 2026 Gabriel Hidalgo
+- **Free** for personal projects, learning, research and non-profits ([PolyForm Noncommercial 1.0.0](LICENSE)).
+- **Using it at work** (a company, client work, or inside a product or service) needs a [commercial licence](COMMERCIAL.md): [US$49 one-time per company](https://buy.stripe.com/aFabJ0ah3cf33V1acC87K02).
+- Versions up to and including v0.14.x were released under MIT and remain MIT.
+
+© 2026 Gabriel Hidalgo
